@@ -15,27 +15,28 @@ const Navbar = () => {
 				כדורגל שכונתי
 			</Link>
 			<nav className="flex space-x-reverse space-x-6">
-				<Link href="/players" className={cn('hover:text-green-200 transition-colors flex items-center gap-2')}>
-					<Users className="h-4 w-4" />
-					<span>שחקנים</span>
-				</Link>
-				<Link href="/matches" className={cn('hover:text-green-200 transition-colors flex items-center gap-2')}>
-					<Volleyball className="h-4 w-4" />
-					<span>משחקים</span>
-				</Link>
-				<Link href="/table" className={cn('hover:text-green-200 transition-colors flex items-center gap-2')}>
-					<Trophy className="h-4 w-4" />
-					<span>טבלת ליגה</span>
-				</Link>
-
 				{user ? (
-					<div className="flex items-center space-x-reverse space-x-4">
-						<span className="text-green-200">{user.name}</span>
-						<Button onClick={logout} variant="destructive" size="sm" className="flex items-center gap-2 rtl">
-							<LogOut className="h-4 w-4" />
-							<span>התנתק</span>
-						</Button>
-					</div>
+					<>
+						<Link href="/players" className={cn('hover:text-green-200 transition-colors flex items-center gap-2')}>
+							<Users className="h-4 w-4" />
+							<span>שחקנים</span>
+						</Link>
+						<Link href="/matches" className={cn('hover:text-green-200 transition-colors flex items-center gap-2')}>
+							<Volleyball className="h-4 w-4" />
+							<span>משחקים</span>
+						</Link>
+						<Link href="/table" className={cn('hover:text-green-200 transition-colors flex items-center gap-2')}>
+							<Trophy className="h-4 w-4" />
+							<span>טבלת ליגה</span>
+						</Link>
+						<div className="flex items-center space-x-reverse space-x-4">
+							<span className="text-green-200">{user.name}</span>
+							<Button onClick={logout} variant="destructive" size="sm" className="flex items-center gap-2 rtl">
+								<LogOut className="h-4 w-4" />
+								<span>התנתק</span>
+							</Button>
+						</div>
+					</>
 				) : (
 					<Link href="/login" className="hover:text-green-200 transition-colors">
 						התחברות
