@@ -1,71 +1,60 @@
-import mongoose, {Document, Schema} from 'mongoose';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import { z } from 'zod'
+import bcrypt from 'bcryptjs'
+import jwt from 'jsonwebtoken'
+import { config } from '../config'
+import { validate, isValidEmail, ValidationError } from '../utils/schemaValidator'
 
-export interface IUser extends Document {
-	name: string;
-	email: string;
-	password?: string;
-	googleId?: string;
-	picture?: string;
-	createdAt: Date;
-	updatedAt: Date;
-	generateAuthToken: () => string;
-	matchPassword: (enteredPassword: string) => Promise<boolean>;
+export interface IUser {
+	_id?: string
+	name: string
+	email: string
+	password?: string
+	googleId?: string
+	picture?: string
+	createdAt: Date
+	updatedAt: Date
 }
 
-const UserSchema: Schema = new Schema(
-	{
-		name: {
-			type: String,
-			required: [true, 'Please provide name'],
-			trim: true,
-		},
-		email: {
-			type: String,
-			required: [true, 'Please provide email'],
-			unique: true,
-			match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please provide a valid email'],
-		},
-		password: {
-			type: String,
-			required: false,
-			minlength: 6,
-			select: false,
-		},
-		googleId: {
-			type: String,
-			required: false,
-		},
-		picture: {
-			type: String,
-			required: false,
-		},
-	},
-	{timestamps: true}
-);
+// Define Zod schema for user validation
+export const UserSchema = z.object({
+	name: z.string().min(1, 'Please provide name').trim(),
+	email: z.string().min(1, 'Please provide email').refine(isValidEmail, 'Please provide a valid email'),
+	password: z.string().min(6, 'Password must be at least 6 characters').optional(),
+	googleId: z.string().optional(),
+	picture: z.string().optional(),
+	createdAt: z
+		.date()
+		.optional()
+		.default(() => new Date()),
+	updatedAt: z
+		.date()
+		.optional()
+		.default(() => new Date())
+})
 
-// Encrypt password using bcrypt
-UserSchema.pre('save', async function (next) {
-	if (!this.isModified('password') || !this.password) {
-		next();
-		return;
-	}
+export type UserInput = z.infer<typeof UserSchema>
 
-	const salt = await bcrypt.genSalt(10);
-	this.password = await bcrypt.hash(this.password as string, salt);
-	next();
-});
+// Helper functions
+export const validateUser = (userData: UserInput): UserInput => {
+	return validate(userData, UserSchema)
+}
 
-// Generate JWT
-UserSchema.methods.generateAuthToken = function () {
-	return jwt.sign({id: this._id}, process.env.JWT_SECRET || 'secret', {expiresIn: '30d'});
-};
+export const hashPassword = async (password: string): Promise<string> => {
+	const salt = await bcrypt.genSalt(10)
+	return await bcrypt.hash(password, salt)
+}
 
-// Match user entered password to hashed password in database
-UserSchema.methods.matchPassword = async function (enteredPassword: string) {
-	if (!this.password) return false;
-	return await bcrypt.compare(enteredPassword, this.password);
-};
+export const comparePassword = async (password: string, hashedPassword: string): Promise<boolean> => {
+	return await bcrypt.compare(password, hashedPassword)
+}
 
-export default mongoose.model<IUser>('User', UserSchema);
+export const generateAuthToken = (userId: string): string => {
+	return jwt.sign({ id: userId }, config.jwtSecret, { expiresIn: '30d' })
+}
+
+export default {
+	validate: validateUser,
+	hashPassword,
+	comparePassword,
+	generateAuthToken
+}

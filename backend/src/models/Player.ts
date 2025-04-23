@@ -1,51 +1,48 @@
-import mongoose, {Document, Schema} from 'mongoose';
+import { z } from 'zod'
+import { validate, isValidEmail } from '../utils/schemaValidator'
+import { ObjectId } from 'mongodb'
 
-export interface IPlayer extends Document {
-	name: string;
-	rating: number;
-	email: string;
-	phone: string;
-	availability: string[];
-	user: mongoose.Schema.Types.ObjectId;
-	createdAt: Date;
-	updatedAt: Date;
+export interface IPlayer {
+	_id?: string
+	name: string
+	rating: number
+	email: string
+	phone?: string
+	availability: string[]
+	user: string | ObjectId
+	createdAt: Date
+	updatedAt: Date
 }
 
-const PlayerSchema: Schema = new Schema(
-	{
-		name: {
-			type: String,
-			required: [true, 'Please provide player name'],
-			trim: true,
-		},
-		rating: {
-			type: Number,
-			required: [true, 'Please provide player rating'],
-			min: 1,
-			max: 10,
-		},
-		email: {
-			type: String,
-			required: [true, 'Please provide email'],
-			unique: true,
-			match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please provide a valid email'],
-		},
-		phone: {
-			type: String,
-			required: false,
-		},
-		availability: {
-			type: [String],
-			enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-			default: [],
-		},
-		user: {
-			type: mongoose.Schema.Types.ObjectId,
-			ref: 'User',
-			required: true,
-		},
-	},
-	{timestamps: true}
-);
+// Define week days for availability
+const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const
+type WeekDay = (typeof weekDays)[number]
 
-export default mongoose.model<IPlayer>('Player', PlayerSchema);
+// Define Zod schema for player validation
+export const PlayerSchema = z.object({
+	name: z.string().min(1, 'Please provide player name').trim(),
+	rating: z.number().min(1, 'Rating must be at least 1').max(10, 'Rating cannot exceed 10'),
+	email: z.string().min(1, 'Please provide email').refine(isValidEmail, 'Please provide a valid email'),
+	phone: z.string().optional(),
+	availability: z.array(z.enum(weekDays)).default([]),
+	user: z.string().or(z.instanceof(ObjectId)),
+	createdAt: z
+		.date()
+		.optional()
+		.default(() => new Date()),
+	updatedAt: z
+		.date()
+		.optional()
+		.default(() => new Date())
+})
+
+export type PlayerInput = z.infer<typeof PlayerSchema>
+
+// Helper function
+export const validatePlayer = (playerData: PlayerInput): PlayerInput => {
+	return validate(playerData, PlayerSchema)
+}
+
+export default {
+	validate: validatePlayer
+}

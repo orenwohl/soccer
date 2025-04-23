@@ -1,25 +1,30 @@
-import mongoose from 'mongoose';
-import dotenv from 'dotenv';
+import { MongoClient } from 'mongodb'
+import dotenv from 'dotenv'
+import { config } from './index'
+dotenv.config()
 
-dotenv.config();
+export const dbService = {
+	getCollection
+}
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/neighborhood-football';
+var dbConn: any = null
 
-const connectDB = async (): Promise<void> => {
+async function getCollection(collectionName: string) {
+	const db = await _connect()
+	const collection = await db.collection(collectionName)
+	return collection
+}
+
+async function _connect(): Promise<any> {
+	if (dbConn) return dbConn
 	try {
-		const conn = await mongoose.connect(process.env.MONGODB_URI as string);
-
-		// Only in development mode, reset the collections with changed schemas
-		if (process.env.NODE_ENV === 'development' && process.env.RESET_DB === 'true') {
-			console.log('Resetting matches collection...');
-			await mongoose.connection.collections['matches']?.drop();
-		}
-
-		console.log(`MongoDB Connected: ${conn.connection.host}`);
+		const conn = await MongoClient.connect(config.dbURL)
+		console.log('Connected to MongoDB')
+		const db = conn.db(config.dbName)
+		dbConn = db
+		return db
 	} catch (error) {
-		console.error(`MongoDB connection error: ${error}`);
-		process.exit(1);
+		console.error(`MongoDB connection error: ${error}`)
+		process.exit(1)
 	}
-};
-
-export default connectDB;
+}

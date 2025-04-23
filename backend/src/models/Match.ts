@@ -1,161 +1,116 @@
-import mongoose, {Document, Schema} from 'mongoose';
+import { z } from 'zod'
+import { validate } from '../utils/schemaValidator'
+import { ObjectId } from 'mongodb'
 
-interface TeamPlayer {
-	playerId: mongoose.Types.ObjectId;
-	name: string;
-	rating: number;
+export interface TeamPlayer {
+	playerId: string | ObjectId
+	name: string
+	rating: number
 }
 
-interface Team {
-	name: string;
-	players: TeamPlayer[];
-	averageRating: number;
-	score: number;
-	color?: string;
+export interface Team {
+	name: string
+	players: TeamPlayer[]
+	averageRating: number
+	score: number
+	color?: string
 }
 
-export interface IMatch extends Document {
-	date: Date;
-	location: string;
-	teams: Team[];
-	gameResults: any[];
-	statistics: any[];
-	isCompleted: boolean;
-	user: mongoose.Types.ObjectId;
-	createdAt: Date;
-	updatedAt: Date;
+export interface GameResult {
+	_id?: string
+	team1: string
+	team2: string
+	team1Score: number
+	team2Score: number
+	date: Date
+	winner: string | null
 }
 
-const TeamPlayerSchema: Schema = new Schema({
-	playerId: {
-		type: Schema.Types.ObjectId,
-		ref: 'Player',
-		required: true,
-	},
-	name: {
-		type: String,
-		required: true,
-	},
-	rating: {
-		type: Number,
-		required: true,
-	},
-});
+export interface TeamStat {
+	teamId: string
+	teamName: string
+	played: number
+	won: number
+	drawn: number
+	lost: number
+	goalsFor: number
+	goalsAgainst: number
+}
 
-const TeamSchema: Schema = new Schema({
-	name: {
-		type: String,
-		required: true,
-	},
-	players: [TeamPlayerSchema],
-	averageRating: {
-		type: Number,
-		required: true,
-	},
-	score: {
-		type: Number,
-		default: 0,
-	},
-	color: {
-		type: String,
-		default: '#9ca3af',
-	},
-});
+export interface IMatch {
+	_id?: string
+	date: Date
+	location: string
+	teams: Team[]
+	gameResults: GameResult[]
+	statistics: TeamStat[]
+	isCompleted: boolean
+	user?: string | ObjectId
+	createdAt: Date
+	updatedAt: Date
+}
 
-// Game result schema
-const GameResultSchema: Schema = new Schema(
-	{
-		team1: {
-			type: String,
-			required: true,
-		},
-		team2: {
-			type: String,
-			required: true,
-		},
-		team1Score: {
-			type: Number,
-			required: true,
-		},
-		team2Score: {
-			type: Number,
-			required: true,
-		},
-		date: {
-			type: Date,
-			default: Date.now,
-		},
-		winner: {
-			type: String,
-			default: null,
-		},
-	},
-	{_id: true}
-);
+// Define Zod schemas for validation
+const TeamPlayerSchema = z.object({
+	playerId: z.string().or(z.instanceof(ObjectId)),
+	name: z.string().min(1, 'Player name is required'),
+	rating: z.number().min(1, 'Rating is required')
+})
 
-// Team statistics schema
-const TeamStatSchema: Schema = new Schema(
-	{
-		teamId: {
-			type: String,
-			required: true,
-		},
-		teamName: {
-			type: String,
-			required: true,
-		},
-		played: {
-			type: Number,
-			default: 0,
-		},
-		won: {
-			type: Number,
-			default: 0,
-		},
-		drawn: {
-			type: Number,
-			default: 0,
-		},
-		lost: {
-			type: Number,
-			default: 0,
-		},
-		goalsFor: {
-			type: Number,
-			default: 0,
-		},
-		goalsAgainst: {
-			type: Number,
-			default: 0,
-		},
-	},
-	{_id: false}
-);
+const TeamSchema = z.object({
+	name: z.string().min(1, 'Team name is required'),
+	players: z.array(TeamPlayerSchema),
+	averageRating: z.number(),
+	score: z.number().default(0),
+	color: z.string().default('#9ca3af')
+})
 
-const MatchSchema: Schema = new Schema(
-	{
-		date: {
-			type: Date,
-			required: [true, 'Please provide match date'],
-		},
-		location: {
-			type: String,
-			required: [true, 'Please provide match location'],
-		},
-		teams: [TeamSchema],
-		gameResults: [GameResultSchema],
-		statistics: [TeamStatSchema],
-		isCompleted: {
-			type: Boolean,
-			default: false,
-		},
-		user: {
-			type: mongoose.Schema.Types.ObjectId,
-			ref: 'User',
-			required: false,
-		},
-	},
-	{timestamps: true}
-);
+const GameResultSchema = z.object({
+	_id: z.string().optional(),
+	team1: z.string().min(1, 'Team 1 name is required'),
+	team2: z.string().min(1, 'Team 2 name is required'),
+	team1Score: z.number().int(),
+	team2Score: z.number().int(),
+	date: z.date().default(() => new Date()),
+	winner: z.string().nullable().default(null)
+})
 
-export default mongoose.model<IMatch>('Match', MatchSchema);
+const TeamStatSchema = z.object({
+	teamId: z.string().min(1, 'Team ID is required'),
+	teamName: z.string().min(1, 'Team name is required'),
+	played: z.number().int().default(0),
+	won: z.number().int().default(0),
+	drawn: z.number().int().default(0),
+	lost: z.number().int().default(0),
+	goalsFor: z.number().int().default(0),
+	goalsAgainst: z.number().int().default(0)
+})
+
+export const MatchSchema = z.object({
+	date: z.date(),
+	location: z.string().min(1, 'Location is required'),
+	teams: z.array(TeamSchema).default([]),
+	gameResults: z.array(GameResultSchema).default([]),
+	statistics: z.array(TeamStatSchema).default([]),
+	isCompleted: z.boolean().default(false),
+	user: z.string().or(z.instanceof(ObjectId)).optional(),
+	createdAt: z
+		.date()
+		.optional()
+		.default(() => new Date()),
+	updatedAt: z
+		.date()
+		.optional()
+		.default(() => new Date())
+})
+
+export type MatchInput = z.infer<typeof MatchSchema>
+
+// Helper function
+export const validateMatch = (matchData: MatchInput): MatchInput => {
+	return validate(matchData, MatchSchema)
+}
+
+export default {
+	validate: validateMatch
+}

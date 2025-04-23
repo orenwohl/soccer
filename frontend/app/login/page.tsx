@@ -1,110 +1,178 @@
-'use client';
+'use client'
 
-import {useState} from 'react';
-import {useAuth} from '../context/AuthContext';
+import { useState } from 'react'
+import { useAuth } from '../context/AuthContext'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm } from 'react-hook-form'
+import * as z from 'zod'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { motion } from 'framer-motion'
 
-export default function Login() {
-	const [email, setEmail] = useState('');
-	const [password, setPassword] = useState('');
-	const [isLogin, setIsLogin] = useState(true);
-	const [name, setName] = useState('');
+// Login form schema
+const loginSchema = z.object({
+	email: z.string().email({ message: 'נא להזין כתובת דוא״ל תקינה' }),
+	password: z.string().min(6, { message: 'הסיסמה חייבת להכיל לפחות 6 תווים' })
+})
 
-	const {login, register, loading} = useAuth();
+// Signup form schema
+const signupSchema = z.object({
+	name: z.string().min(2, { message: 'השם חייב להכיל לפחות 2 תווים' }),
+	email: z.string().email({ message: 'נא להזין כתובת דוא״ל תקינה' }),
+	password: z.string().min(6, { message: 'הסיסמה חייבת להכיל לפחות 6 תווים' })
+})
 
-	const handleSubmit = async (e: React.FormEvent) => {
-		e.preventDefault();
+type LoginFormValues = z.infer<typeof loginSchema>
+type SignupFormValues = z.infer<typeof signupSchema>
 
-		if (isLogin) {
-			await login(email, password);
-		} else {
-			await register(name, email, password);
+export default function AuthPage() {
+	const [activeTab, setActiveTab] = useState<string>('login')
+	const { login, register, loading } = useAuth()
+
+	// Login form
+	const loginForm = useForm<LoginFormValues>({
+		resolver: zodResolver(loginSchema),
+		defaultValues: {
+			email: '',
+			password: ''
 		}
-	};
+	})
+
+	// Signup form
+	const signupForm = useForm<SignupFormValues>({
+		resolver: zodResolver(signupSchema),
+		defaultValues: {
+			name: '',
+			email: '',
+			password: ''
+		}
+	})
+
+	const onLoginSubmit = async (values: LoginFormValues) => {
+		await login(values.email, values.password)
+	}
+
+	const onSignupSubmit = async (values: SignupFormValues) => {
+		await register(values.name, values.email, values.password)
+	}
 
 	return (
-		<div className='max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-md'>
-			<h1 className='text-2xl font-bold mb-6 text-center'>{isLogin ? 'התחברות' : 'הרשמה'}</h1>
+		<div dir="rtl" className="max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-md">
+			<h1 className="text-2xl font-bold mb-6 text-center">כדורגל שכונתי</h1>
 
-			<form onSubmit={handleSubmit}>
-				{!isLogin && (
-					<div className='mb-4'>
-						<label
-							className='block text-gray-700 text-sm font-bold mb-2'
-							htmlFor='name'>
-							שם מלא
-						</label>
-						<input
-							className='shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline'
-							id='name'
-							type='text'
-							placeholder='שם מלא'
-							value={name}
-							onChange={(e) => setName(e.target.value)}
-							required={!isLogin}
-						/>
-					</div>
-				)}
+			<Tabs defaultValue="login" value={activeTab} onValueChange={setActiveTab} className="w-full" dir="rtl">
+				<TabsList className="grid w-full grid-cols-2 mb-6">
+					<TabsTrigger value="login" className="text-center">
+						התחברות
+					</TabsTrigger>
+					<TabsTrigger value="signup" className="text-center">
+						הרשמה
+					</TabsTrigger>
+				</TabsList>
 
-				<div className='mb-4'>
-					<label
-						className='block text-gray-700 text-sm font-bold mb-2'
-						htmlFor='email'>
-						דוא״ל
-					</label>
-					<input
-						className='shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline'
-						id='email'
-						type='email'
-						placeholder='דוא״ל'
-						value={email}
-						onChange={(e) => setEmail(e.target.value)}
-						required
-					/>
-				</div>
+				<TabsContent value="login" className="mt-2">
+					<motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }}>
+						<Form {...loginForm}>
+							<form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
+								<FormField
+									control={loginForm.control}
+									name="email"
+									render={({ field }) => (
+										<FormItem className="text-right">
+											<FormLabel>דוא״ל</FormLabel>
+											<FormControl>
+												<Input placeholder="הזן את הדוא״ל שלך" {...field} />
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
 
-				<div className='mb-6'>
-					<label
-						className='block text-gray-700 text-sm font-bold mb-2'
-						htmlFor='password'>
-						סיסמה
-					</label>
-					<input
-						className='shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline'
-						id='password'
-						type='password'
-						placeholder='סיסמה'
-						value={password}
-						onChange={(e) => setPassword(e.target.value)}
-						required
-					/>
-				</div>
+								<FormField
+									control={loginForm.control}
+									name="password"
+									render={({ field }) => (
+										<FormItem className="text-right">
+											<FormLabel>סיסמה</FormLabel>
+											<FormControl>
+												<Input type="password" placeholder="הזן את הסיסמה שלך" {...field} />
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
 
-				<div className='flex items-center justify-between mb-4'>
-					<button
-						className='bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline'
-						type='submit'
-						disabled={loading}>
-						{loading ? 'מעבד...' : isLogin ? 'התחבר' : 'הירשם'}
-					</button>
+								<Button type="submit" className="w-full" disabled={loading}>
+									{loading ? 'מתחבר...' : 'התחבר'}
+								</Button>
+							</form>
+						</Form>
+					</motion.div>
+				</TabsContent>
 
-					<button
-						type='button'
-						className='inline-block align-baseline font-bold text-sm text-green-600 hover:text-green-800'
-						onClick={() => setIsLogin(!isLogin)}>
-						{isLogin ? 'אין לך חשבון?' : 'כבר יש לך חשבון?'}
-					</button>
-				</div>
+				<TabsContent value="signup" className="mt-2">
+					<motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }}>
+						<Form {...signupForm}>
+							<form onSubmit={signupForm.handleSubmit(onSignupSubmit)} className="space-y-4">
+								<FormField
+									control={signupForm.control}
+									name="name"
+									render={({ field }) => (
+										<FormItem className="text-right">
+											<FormLabel>שם מלא</FormLabel>
+											<FormControl>
+												<Input placeholder="הזן את שמך המלא" {...field} />
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
 
-				<div className='mt-4 text-center'>
-					<p className='text-gray-600 mb-2'>או התחבר באמצעות</p>
-					<button
-						type='button'
-						className='bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full'
-						onClick={() => alert('התחברות עם גוגל תהיה זמינה בקרוב')}>
-						גוגל
-					</button>
-				</div>
-			</form>
+								<FormField
+									control={signupForm.control}
+									name="email"
+									render={({ field }) => (
+										<FormItem className="text-right">
+											<FormLabel>דוא״ל</FormLabel>
+											<FormControl>
+												<Input placeholder="הזן את הדוא״ל שלך" {...field} />
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+
+								<FormField
+									control={signupForm.control}
+									name="password"
+									render={({ field }) => (
+										<FormItem className="text-right">
+											<FormLabel>סיסמה</FormLabel>
+											<FormControl>
+												<Input type="password" placeholder="בחר סיסמה" {...field} />
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+
+								<Button type="submit" className="w-full" disabled={loading}>
+									{loading ? 'נרשם...' : 'הירשם'}
+								</Button>
+							</form>
+						</Form>
+					</motion.div>
+				</TabsContent>
+			</Tabs>
+
+			<div className="mt-6 text-center">
+				<p className="text-muted-foreground mb-2">או התחבר באמצעות</p>
+				<Button variant="outline" className="w-full" onClick={() => alert('התחברות עם גוגל תהיה זמינה בקרוב')}>
+					גוגל
+				</Button>
+			</div>
 		</div>
-	);
+	)
 }

@@ -1,29 +1,36 @@
-import {Request, Response} from 'express';
-import User from '../models/User';
+import { Request, Response } from 'express'
+import User from '../models/User' // Keep for type and token generation methods
+import { dbService } from '../config/db'
+import { ObjectId } from 'mongodb'
+import bcrypt from 'bcryptjs'
+import jwt from 'jsonwebtoken'
+import { config } from '../config'
 
-// @desc    Register a user
-// @route   POST /api/auth/register
-// @access  Public
 export const register = async (req: Request, res: Response): Promise<void> => {
 	try {
-		const {name, email, password} = req.body;
+		const { name, email, password } = req.body
+		const collection = await dbService.getCollection('users')
 
-		// Check if user exists
-		const userExists = await User.findOne({email});
+		const userExists = await collection.findOne({ email })
 		if (userExists) {
-			res.status(400).json({success: false, message: 'User already exists'});
-			return;
+			res.status(400).json({ success: false, message: 'User already exists' })
+			return
 		}
 
-		// Create user
-		const user = await User.create({
+		const salt = await bcrypt.genSalt(10)
+		const hashedPassword = await bcrypt.hash(password, salt)
+
+		const result = await collection.insertOne({
 			name,
 			email,
-			password,
-		});
+			password: hashedPassword,
+			createdAt: new Date(),
+			updatedAt: new Date()
+		})
 
-		// Generate token
-		const token = user.generateAuthToken();
+		const user = await collection.findOne({ _id: result.insertedId })
+
+		const token = jwt.sign({ id: user._id }, config.jwtSecret, { expiresIn: '30d' })
 
 		res.status(201).json({
 			success: true,
@@ -31,38 +38,36 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 			user: {
 				id: user._id,
 				name: user.name,
-				email: user.email,
-			},
-		});
+				email: user.email
+			}
+		})
 	} catch (error) {
-		console.error(error);
-		res.status(500).json({success: false, message: 'Server Error'});
+		console.error(error)
+		res.status(500).json({ success: false, message: 'Server Error' })
 	}
-};
+}
 
-// @desc    Login user
-// @route   POST /api/auth/login
-// @access  Public
 export const login = async (req: Request, res: Response): Promise<void> => {
 	try {
-		const {email, password} = req.body;
+		const { email, password } = req.body
+		const collection = await dbService.getCollection('users')
 
 		// Check for user
-		const user = await User.findOne({email}).select('+password');
+		const user = await collection.findOne({ email })
 		if (!user) {
-			res.status(401).json({success: false, message: 'Invalid credentials'});
-			return;
+			res.status(401).json({ success: false, message: 'Invalid credentials' })
+			return
 		}
 
 		// Check if password matches
-		const isMatch = await user.matchPassword(password);
+		const isMatch = await bcrypt.compare(password, user.password)
 		if (!isMatch) {
-			res.status(401).json({success: false, message: 'Invalid credentials'});
-			return;
+			res.status(401).json({ success: false, message: 'Invalid credentials' })
+			return
 		}
 
 		// Generate token
-		const token = user.generateAuthToken();
+		const token = jwt.sign({ id: user._id }, config.jwtSecret, { expiresIn: '30d' })
 
 		res.json({
 			success: true,
@@ -71,14 +76,14 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 				id: user._id,
 				name: user.name,
 				email: user.email,
-				picture: user.picture,
-			},
-		});
+				picture: user.picture
+			}
+		})
 	} catch (error) {
-		console.error(error);
-		res.status(500).json({success: false, message: 'Server Error'});
+		console.error(error)
+		res.status(500).json({ success: false, message: 'Server Error' })
 	}
-};
+}
 
 // @desc    Get current logged in user
 // @route   GET /api/auth/me
@@ -86,11 +91,12 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 export const getMe = async (req: Request, res: Response): Promise<void> => {
 	try {
 		// req.user is set in the auth middleware
-		const user = await User.findById(req.user.id);
+		const collection = await dbService.getCollection('users')
+		const user = await collection.findOne({ _id: new ObjectId(req.user.id) })
 
 		if (!user) {
-			res.status(404).json({success: false, message: 'User not found'});
-			return;
+			res.status(404).json({ success: false, message: 'User not found' })
+			return
 		}
 
 		res.json({
@@ -99,11 +105,11 @@ export const getMe = async (req: Request, res: Response): Promise<void> => {
 				id: user._id,
 				name: user.name,
 				email: user.email,
-				picture: user.picture,
-			},
-		});
+				picture: user.picture
+			}
+		})
 	} catch (error) {
-		console.error(error);
-		res.status(500).json({success: false, message: 'Server Error'});
+		console.error(error)
+		res.status(500).json({ success: false, message: 'Server Error' })
 	}
-};
+}

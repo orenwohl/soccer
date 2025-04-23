@@ -1,119 +1,139 @@
-'use client';
+'use client'
 
-import {createContext, useContext, useState, useEffect, ReactNode} from 'react';
-import {useRouter} from 'next/navigation';
-import axios from 'axios';
-import {toast} from 'react-hot-toast';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
+import { toast } from 'react-hot-toast'
+import Cookies from 'js-cookie'
+import { authApi } from '../services/api'
 
 interface User {
-	id: string;
-	name: string;
-	email: string;
-	picture?: string;
+	id: string
+	name: string
+	email: string
+	picture?: string
 }
 
 interface AuthContextType {
-	user: User | null;
-	loading: boolean;
-	login: (email: string, password: string) => Promise<void>;
-	register: (name: string, email: string, password: string) => Promise<void>;
-	logout: () => void;
+	user: User | null
+	loading: boolean
+	login: (email: string, password: string) => Promise<void>
+	register: (name: string, email: string, password: string) => Promise<void>
+	logout: () => void
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export const AuthProvider = ({children}: {children: ReactNode}) => {
-	const [user, setUser] = useState<User | null>(null);
-	const [loading, setLoading] = useState(true);
-	const router = useRouter();
+// Set cookie expiration to 30 days
+const COOKIE_EXPIRATION = 30
+
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+	const [user, setUser] = useState<User | null>(null)
+	const [loading, setLoading] = useState(true)
+	const router = useRouter()
 
 	useEffect(() => {
 		// Check if user is logged in
-		const token = localStorage.getItem('token');
+		const token = Cookies.get('token')
 		if (token) {
-			loadUser(token);
+			loadUser()
 		} else {
-			setLoading(false);
+			setLoading(false)
 		}
-	}, []);
+	}, [])
 
-	const loadUser = async (token: string) => {
+	const loadUser = async () => {
 		try {
-			const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/me`, {
-				headers: {
-					Authorization: `Bearer ${token}`,
-				},
-			});
-			setUser(res.data.user);
+			const response = await authApi.getMe()
+			if (response.success) {
+				setUser(response.user)
+			} else {
+				// Only remove token if the error is specifically related to authentication
+				if (response.error?.includes('authorization') || response.error?.includes('authenticated') || response.error?.includes('token')) {
+					console.warn('Removing token due to auth error:', response.error)
+					Cookies.remove('token')
+					setUser(null)
+				}
+			}
 		} catch (err) {
-			console.error('Error loading user:', err);
-			localStorage.removeItem('token');
+			console.error('Error loading user:', err)
+			// Only remove token on specific auth errors, not on network errors
+			// This prevents logouts on temporary network issues
+			if (err instanceof Error && (err.message.includes('authorization') || err.message.includes('token') || err.message.includes('auth'))) {
+				Cookies.remove('token')
+				setUser(null)
+			}
 		} finally {
-			setLoading(false);
+			setLoading(false)
 		}
-	};
+	}
 
 	const login = async (email: string, password: string) => {
 		try {
-			setLoading(true);
-			const res = await axios.post(
-				`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/login`,
-				{
-					email,
-					password,
-				}
-			);
+			setLoading(true)
+			const response = await authApi.login({ email, password })
 
-			localStorage.setItem('token', res.data.token);
-			setUser(res.data.user);
-			toast.success('התחברת בהצלחה');
-			router.push('/');
+			if (response.success) {
+				// Store token in cookie
+				Cookies.set('token', response.token, { expires: COOKIE_EXPIRATION })
+				setUser(response.user)
+				toast.success('התחברת בהצלחה')
+
+				// Check if there's a callback URL to redirect to
+				const urlParams = new URLSearchParams(window.location.search)
+				const callbackUrl = urlParams.get('callbackUrl')
+
+				if (callbackUrl) {
+					window.location.href = decodeURI(callbackUrl)
+				} else {
+					router.push('/')
+				}
+			} else {
+				toast.error(response.error || 'התחברות נכשלה')
+			}
 		} catch (err) {
-			const error = err as Error & {response?: {data?: {message?: string}}};
-			toast.error(error.response?.data?.message || 'התחברות נכשלה');
+			const error = err as Error & { response?: { data?: { message?: string } } }
+			toast.error(error.response?.data?.message || 'התחברות נכשלה')
 		} finally {
-			setLoading(false);
+			setLoading(false)
 		}
-	};
+	}
 
 	const register = async (name: string, email: string, password: string) => {
 		try {
-			setLoading(true);
-			const res = await axios.post(
-				`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/register`,
-				{
-					name,
-					email,
-					password,
-				}
-			);
+			setLoading(true)
+			const response = await authApi.register({ name, email, password })
 
-			localStorage.setItem('token', res.data.token);
-			setUser(res.data.user);
-			toast.success('נרשמת בהצלחה');
-			router.push('/');
+			if (response.success) {
+				// Store token in cookie
+				Cookies.set('token', response.token, { expires: COOKIE_EXPIRATION })
+				setUser(response.user)
+				toast.success('נרשמת בהצלחה')
+				router.push('/')
+			} else {
+				toast.error(response.error || 'ההרשמה נכשלה')
+			}
 		} catch (err) {
-			const error = err as Error & {response?: {data?: {message?: string}}};
-			toast.error(error.response?.data?.message || 'ההרשמה נכשלה');
+			const error = err as Error & { response?: { data?: { message?: string } } }
+			toast.error(error.response?.data?.message || 'ההרשמה נכשלה')
 		} finally {
-			setLoading(false);
+			setLoading(false)
 		}
-	};
+	}
 
 	const logout = () => {
-		localStorage.removeItem('token');
-		setUser(null);
-		toast.success('התנתקת בהצלחה');
-		router.push('/login');
-	};
+		Cookies.remove('token')
+		setUser(null)
+		toast.success('התנתקת בהצלחה')
+		router.push('/login')
+	}
 
-	return <AuthContext.Provider value={{user, loading, login, register, logout}}>{children}</AuthContext.Provider>;
-};
+	return <AuthContext.Provider value={{ user, loading, login, register, logout }}>{children}</AuthContext.Provider>
+}
 
 export const useAuth = () => {
-	const context = useContext(AuthContext);
+	const context = useContext(AuthContext)
 	if (context === undefined) {
-		throw new Error('useAuth must be used within an AuthProvider');
+		throw new Error('useAuth must be used within an AuthProvider')
 	}
-	return context;
-};
+	return context
+}

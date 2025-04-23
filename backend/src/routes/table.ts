@@ -1,8 +1,8 @@
-import express from 'express';
-import {getLeagueTable} from '../controllers/tableController';
+import express from 'express'
+import { getTable } from '../controllers/tableController'
 
-const router = express.Router();
+const router = express.Router()
 
-router.route('/').get(getLeagueTable);
+router.route('/').get(getTable)
 
-export default router;
+export default router
