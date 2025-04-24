@@ -5,11 +5,19 @@ import {useRouter} from 'next/navigation';
 import Link from 'next/link';
 import {playerApi} from '@/app/services/api';
 import {Input} from '@/components/ui/input';
+import {Player} from '@/app/types';
 import {Dumbbell, Shield, Briefcase} from 'lucide-react';
 
-export default function NewPlayerPage() {
+export default function EditPlayerPage({params}: {params: {id: string}}) {
 	const router = useRouter();
-	const [formData, setFormData] = useState({
+	const [loading, setLoading] = useState(true);
+	const [formData, setFormData] = useState<
+		Omit<Player, '_id' | 'createdAt' | 'updatedAt'> & {
+			fitnessRating: number;
+			defenseRating: number;
+			techniqueRating: number;
+		}
+	>({
 		name: '',
 		phone: '',
 		rating: 3,
@@ -19,6 +27,39 @@ export default function NewPlayerPage() {
 	});
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+
+	// Fetch player data on component mount
+	useEffect(() => {
+		const fetchPlayer = async () => {
+			try {
+				const response = await playerApi.getById(params.id);
+				if (response.success) {
+					// Extract the fields we need for the form, including the specialized ratings
+					const {name, phone, rating, fitnessRating, defenseRating, techniqueRating} = response.data;
+					setFormData({
+						name,
+						phone,
+						rating,
+						fitnessRating: fitnessRating || 3,
+						defenseRating: defenseRating || 3,
+						techniqueRating: techniqueRating || 3,
+					});
+				} else {
+					const errorMsg = Array.isArray(response.error)
+						? response.error.join(', ')
+						: response.error || 'Failed to load player';
+					throw new Error(errorMsg);
+				}
+			} catch (err) {
+				console.error('Error loading player:', err);
+				setError('Failed to load player data');
+			} finally {
+				setLoading(false);
+			}
+		};
+
+		fetchPlayer();
+	}, [params.id]);
 
 	const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
 		const {name, value} = e.target;
@@ -48,22 +89,22 @@ export default function NewPlayerPage() {
 		setError(null);
 
 		try {
-			// Call the actual API to create the player
-			const response = await playerApi.create(formData);
+			// Call the API to update the player
+			const response = await playerApi.update(params.id, formData);
 
 			if (!response.success) {
-				const errorMessage = typeof response.error === 'string' ? response.error : 'Failed to create player';
+				const errorMessage = typeof response.error === 'string' ? response.error : 'Failed to update player';
 				throw new Error(errorMessage);
 			}
 
-			console.log('Player created successfully:', response.data);
+			console.log('Player updated successfully:', response.data);
 
 			// Navigate back to players list
 			router.push('/players');
 			router.refresh();
 		} catch (err) {
-			console.error('Failed to create player:', err);
-			const errorMessage = err instanceof Error ? err.message : 'נכשל ביצירת שחקן. אנא נסה שוב.';
+			console.error('Failed to update player:', err);
+			const errorMessage = err instanceof Error ? err.message : 'נכשל בעדכון שחקן. אנא נסה שוב.';
 			setError(errorMessage);
 		} finally {
 			setIsSubmitting(false);
@@ -87,11 +128,19 @@ export default function NewPlayerPage() {
 		return stars;
 	};
 
+	if (loading) {
+		return (
+			<div className='flex justify-center items-center h-64'>
+				<div className='animate-spin rounded-full h-12 w-12 border-b-2 border-green-700'></div>
+			</div>
+		);
+	}
+
 	return (
 		<div>
 			<div className='mb-6'>
-				<h1 className='text-3xl font-bold text-green-800 mb-2'>הוסף שחקן חדש</h1>
-				<p className='text-gray-600'>הרשם שחקן חדש עם פרטיו ודירוג המיומנות שלו</p>
+				<h1 className='text-3xl font-bold text-green-800 mb-2'>עריכת שחקן</h1>
+				<p className='text-gray-600'>עדכן את פרטי השחקן ודירוג המיומנות</p>
 			</div>
 
 			<div className='bg-white shadow-md rounded-lg p-6 max-w-2xl mx-auto'>
@@ -184,7 +233,7 @@ export default function NewPlayerPage() {
 							type='submit'
 							className='bg-green-700 hover:bg-green-800 text-white py-2 px-4 rounded-md transition-colors disabled:bg-gray-400'
 							disabled={isSubmitting}>
-							{isSubmitting ? 'שומר...' : 'שמור שחקן'}
+							{isSubmitting ? 'שומר...' : 'עדכן שחקן'}
 						</button>
 						<Link
 							href='/players'

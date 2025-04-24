@@ -139,10 +139,22 @@ export const matchApi = {
 
 	getById: async (id: string): Promise<MatchResponse> => {
 		try {
+			console.log(`Calling getById API for match ID: ${id}`);
+			console.log(`Full URL: ${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3030'}/api/matches/${id}`);
+
 			const response = await api.get(`/api/matches/${id}`);
+			console.log('API getById raw response:', response);
+
 			return response.data;
 		} catch (error: any) {
 			console.error(`Error fetching match ${id}:`, error);
+			console.error('Full error object:', JSON.stringify(error, null, 2));
+
+			if (error.response) {
+				console.error('Response error data:', error.response.data);
+				console.error('Response status:', error.response.status);
+			}
+
 			return {
 				success: false,
 				data: {} as Match,
@@ -219,6 +231,12 @@ export const matchApi = {
 			team2Score: number;
 			date: string;
 			winner: string | null;
+			goals?: Array<{
+				playerId: string;
+				playerName: string;
+				teamId: string;
+				teamName: string;
+			}>;
 		}
 	): Promise<{success: boolean; data?: unknown; error?: string}> => {
 		const response = await api.post(`/api/matches/${gameDayId}/game-result`, resultData);
@@ -315,6 +333,54 @@ export const matchApi = {
 		} catch (error) {
 			console.error('Error saving team statistics:', error);
 			return false;
+		}
+	},
+
+	addGoal: async (
+		gameDayId: string,
+		goalData: {
+			playerId: string;
+			playerName: string;
+			teamId: string;
+			teamName: string;
+			matchId?: string;
+		}
+	): Promise<{success: boolean; data?: unknown; error?: string}> => {
+		try {
+			console.log(`Calling addGoal API for game day ID: ${gameDayId}`, goalData);
+			console.log(
+				`Full URL: ${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3030'}/api/matches/${gameDayId}/goal`
+			);
+
+			const response = await api.post(`/api/matches/${gameDayId}/goal`, goalData);
+			console.log('Goal API response:', response.data);
+			return response.data;
+		} catch (error: any) {
+			console.error('Error adding goal:', error);
+
+			if (error.response) {
+				console.error('Response error data:', error.response.data);
+				console.error('Response status:', error.response.status);
+			}
+
+			return {success: false, error: 'Failed to add goal'};
+		}
+	},
+
+	getTopScorers: async (
+		gameDayId: string
+	): Promise<{
+		success: boolean;
+		data?: Array<{playerId: string; playerName: string; goals: number; matches: number}>;
+		error?: string;
+	}> => {
+		try {
+			// Instead of using gameDay-specific endpoint, try general stats endpoint
+			const response = await api.get('/api/stats/scorers');
+			return response.data;
+		} catch (error) {
+			console.error('Error fetching top scorers:', error);
+			return {success: false, error: 'Failed to fetch top scorers'};
 		}
 	},
 };

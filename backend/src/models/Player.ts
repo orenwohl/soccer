@@ -1,22 +1,22 @@
-import { z } from 'zod'
-import { validate, isValidEmail } from '../utils/schemaValidator'
-import { ObjectId } from 'mongodb'
+import {z} from 'zod';
+import {validate, isValidEmail} from '../utils/schemaValidator';
+import {ObjectId} from 'mongodb';
 
 export interface IPlayer {
-	_id?: string
-	name: string
-	rating: number
-	email: string
-	phone?: string
-	availability: string[]
-	user: string | ObjectId
-	createdAt: Date
-	updatedAt: Date
+	_id?: string;
+	name: string;
+	rating: number;
+	email: string;
+	phone?: string;
+	availability: string[];
+	user: string | ObjectId;
+	createdAt: Date;
+	updatedAt: Date;
 }
 
 // Define week days for availability
-const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const
-type WeekDay = (typeof weekDays)[number]
+const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
+type WeekDay = (typeof weekDays)[number];
 
 // Define Zod schema for player validation
 export const PlayerSchema = z.object({
@@ -33,16 +33,16 @@ export const PlayerSchema = z.object({
 	updatedAt: z
 		.date()
 		.optional()
-		.default(() => new Date())
-})
+		.default(() => new Date()),
+});
 
-export type PlayerInput = z.infer<typeof PlayerSchema>
+export type PlayerInput = z.infer<typeof PlayerSchema>;
 
 // Helper function
 export const validatePlayer = (playerData: PlayerInput): PlayerInput => {
-	return validate(playerData, PlayerSchema)
-}
+	return validate(playerData, PlayerSchema);
+};
 
 export default {
-	validate: validatePlayer
-}
+	validate: validatePlayer,
+};

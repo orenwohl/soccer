@@ -490,3 +490,64 @@ export const getMatchStatistics = async (req: Request, res: Response): Promise<v
 		res.status(500).json({success: false, error: 'Failed to fetch match statistics'});
 	}
 };
+
+// Add a goal for a player
+export const addGoal = async (req: Request, res: Response): Promise<void> => {
+	try {
+		const matchId = req.params.id;
+		const goalData = req.body;
+		const collection = await dbService.getCollection('matches');
+
+		const match = await collection.findOne({_id: new ObjectId(matchId)});
+		if (!match) {
+			res.status(404).json({success: false, error: 'Match not found'});
+			return;
+		}
+
+		// Make sure user owns the match
+		if (match.user && match.user.toString() !== req.user.id) {
+			res.status(401).json({
+				success: false,
+				error: 'Not authorized to update this match',
+			});
+			return;
+		}
+
+		// Initialize goals array if it doesn't exist
+		if (!match.goals) {
+			match.goals = [];
+		}
+
+		// Add timestamp and ID to the goal data
+		const newGoal = {
+			...goalData,
+			_id: new ObjectId().toString(),
+			timestamp: new Date(),
+			matchId: matchId,
+			gameDayId: matchId,
+		};
+
+		// Add the new goal
+		match.goals.push(newGoal);
+
+		// Update the document in MongoDB
+		await collection.updateOne(
+			{_id: new ObjectId(matchId)},
+			{
+				$set: {
+					goals: match.goals,
+					updatedAt: new Date(),
+				},
+			}
+		);
+
+		res.status(200).json({
+			success: true,
+			data: newGoal,
+			message: 'Goal added successfully',
+		});
+	} catch (error) {
+		console.error('Error adding goal:', error);
+		res.status(500).json({success: false, error: 'Failed to add goal'});
+	}
+};

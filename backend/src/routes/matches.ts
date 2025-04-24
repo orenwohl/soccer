@@ -11,6 +11,7 @@ import {
 	saveStatistics,
 	saveTeamStats,
 	getMatchStatistics,
+	addGoal,
 } from '../controllers/matchController';
 import {protect} from '../middleware/auth';
 
@@ -27,5 +28,6 @@ router.route('/:id/game-result').post(protect, saveGameResult);
 router.route('/:id/match/:matchId').put(protect, updateGameResult);
 router.route('/:id/statistics').post(protect, saveStatistics).get(protect, getMatchStatistics);
 router.route('/:id/stats').post(protect, saveTeamStats);
+router.route('/:id/goal').post(protect, addGoal);
 
 export default router;

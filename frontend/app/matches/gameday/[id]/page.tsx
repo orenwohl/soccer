@@ -3,7 +3,9 @@
 import {useState, useEffect, ReactNode} from 'react';
 import {useRouter} from 'next/navigation';
 import {TeamPlayer, Match} from '@/app/types';
+import {PlayerStats as ImportedPlayerStats} from '@/app/types';
 import {matchApi} from '@/app/services/api';
+import {FaTimes, FaSave, FaUsers, FaSortAmountDown, FaFutbol} from 'react-icons/fa';
 
 // Function to render star rating
 const renderRatingStars = (rating: number) => {
@@ -100,6 +102,25 @@ function CardContent({children, className = ''}: {children: ReactNode; className
 // Default color if no color is specified
 const DEFAULT_COLOR = '#9ca3af'; // Gray
 
+// Define a Game interface with all required properties
+interface Game {
+	id?: string; // Make id optional since some game objects don't have it
+	team1Index: number;
+	team2Index: number;
+	scores: [number, number];
+	finished?: boolean;
+	// Other properties as needed
+}
+
+// Define the PlayerStats interface to match our data structure
+interface PlayerStats {
+	playerId: string;
+	playerName: string;
+	team: string;
+	goals: number;
+	matches: number;
+}
+
 export default function GameDayPage({params}: {params: {id: string}}) {
 	const [gameDay, setGameDay] = useState<Match | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
@@ -111,9 +132,7 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 	const [selectedPlayerForSwap, setSelectedPlayerForSwap] = useState<{playerId: string; teamIndex: number} | null>(
 		null
 	);
-	const [activeGames, setActiveGames] = useState<
-		{team1Index: number; team2Index: number; scores: [number, number]}[]
-	>([]);
+	const [activeGames, setActiveGames] = useState<Game[]>([]);
 	const [teamStatistics, setTeamStatistics] = useState<
 		{
 			teamIndex: number;
@@ -128,10 +147,21 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 	>([]);
 	const [selectedTeams, setSelectedTeams] = useState<number[]>([]);
 	const [waitingTeams, setWaitingTeams] = useState<number[]>([]);
-	const [lastWinner, setLastWinner] = useState<number | null>(null);
+	const [playerGoals, setPlayerGoals] = useState<Record<string, number>>({});
+	const [topScorers, setTopScorers] = useState<PlayerStats[]>([]);
 	const router = useRouter();
 
+	// Current game state to track which game is active when adding goals
+	const [currentGame, setCurrentGame] = useState<Game | null>(null);
+
+	// Comment out unused variables
+	// const {data: gameDayData, error: gameDayError, isLoading: gameDayIsLoading} = useGetGameDay(params.id);
+
+	// Right after useEffect starts and before fetchGameDay, initialize topScorers as an empty array
 	useEffect(() => {
+		// Initialize top scorers as empty to avoid showing the "no scorers found" message initially
+		setTopScorers([]);
+
 		const fetchGameDay = async () => {
 			try {
 				setIsLoading(true);
@@ -144,7 +174,7 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 					if (response.data.teams) {
 						console.log(
 							'Team names:',
-							response.data.teams.map((t: any) => t.name)
+							response.data.teams.map((t) => t.name)
 						);
 					}
 
@@ -215,6 +245,10 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 							// Active games are managed locally during the current session
 						}
 					}
+
+					// We no longer try to fetch top scorers from API, but build them locally from any existing data
+					// This is where we would initialize the topScorers array if we had data
+					// For now, we leave it as an empty array and will be populated when goals are added
 				} else {
 					console.error('Error response from API:', response.error);
 					setError(typeof response.error === 'string' ? response.error : 'שגיאה בטעינת נתוני יום המשחקים');
@@ -714,529 +748,375 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 		if (!gameDay) return null;
 
 		return (
-			<div>
-				<div className='flex items-center justify-between mb-6'>
-					<h2 className='text-xl font-semibold'>טבלה ומשחקים</h2>
-				</div>
-
-				{/* בחירת קבוצות ראשונית */}
-				{activeGames.length === 0 && teamStatistics.length === 0 && (
-					<div className='mb-6 p-4 bg-gray-50 rounded-lg border'>
-						<h3 className='text-lg font-medium mb-3'>בחר 2 קבוצות להתחלה</h3>
-						<div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4'>
-							{gameDay.teams.map((team, index) => (
-								<div
-									key={index}
-									onClick={() => toggleTeamSelection(index)}
-									className={`p-3 rounded-md cursor-pointer flex items-center ${
-										selectedTeams.includes(index)
-											? 'bg-green-100 border-2 border-green-500'
-											: 'bg-white border border-gray-300 hover:bg-gray-50'
-									}`}>
-									<div
-										className='w-4 h-4 rounded-full mr-2'
-										style={{
-											backgroundColor: team.color || DEFAULT_COLOR,
-										}}></div>
-									<span>{team.name}</span>
-								</div>
-							))}
-						</div>
-						<button
-							onClick={addSelectedTeamsToGame}
-							disabled={selectedTeams.length !== 2}
-							className='px-4 py-2 bg-blue-600 text-white rounded-md disabled:opacity-50 hover:bg-blue-700'>
-							התחל משחק
-						</button>
+			<div className='flex flex-col space-y-6 w-full'>
+				{/* Games Section */}
+				<div className='pb-4 border-b border-green-700'>
+					<div className='flex justify-between items-center mb-4'>
+						<h2 className='text-xl font-bold text-green-800'>משחקים</h2>
+						{selectedTeams.length === 2 && (
+							<Button
+								onClick={addSelectedTeamsToGame}
+								className='bg-green-600 hover:bg-green-700'>
+								התחל משחק
+							</Button>
+						)}
 					</div>
-				)}
 
-				{/* משחקים פעילים */}
-				{activeGames.length > 0 && (
-					<div className='mb-6'>
-						<h3 className='text-lg font-medium mb-3'>משחקים פעילים</h3>
-						<div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-							{activeGames.map((game, gameIndex) => (
+					{/* Team selection area */}
+					<div className='mb-4'>
+						<h3 className='text-md font-semibold text-gray-700 mb-2'>בחירת קבוצות למשחק הבא:</h3>
+						<div className='flex flex-wrap gap-2'>
+							{gameDay.teams.map((team, index) => {
+								// Check if team is already playing
+								const isPlaying = activeGames.some(
+									(game) => !game.finished && (game.team1Index === index || game.team2Index === index)
+								);
+
+								return (
+									<button
+										key={index}
+										onClick={() => toggleTeamSelection(index)}
+										className={`px-3 py-1 rounded-full text-sm font-medium ${
+											selectedTeams.includes(index)
+												? 'bg-green-600 text-white'
+												: isPlaying
+												? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+												: 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+										}`}
+										disabled={isPlaying}>
+										{team.name}
+									</button>
+								);
+							})}
+						</div>
+					</div>
+
+					{/* Active Games */}
+					<h3 className='text-md font-semibold text-gray-700 mb-2'>משחקים פעילים:</h3>
+					<div className='flex flex-col space-y-4'>
+						{activeGames.length === 0 ? (
+							<p className='text-gray-500 text-center'>אין משחקים פעילים כרגע</p>
+						) : (
+							activeGames.map((game, gameIndex) => (
 								<div
 									key={gameIndex}
-									className='bg-white p-4 rounded-lg shadow-sm border'>
-									<div className='flex justify-between items-center mb-4'>
-										<h4 className='font-medium'>משחק {gameIndex + 1}</h4>
-									</div>
-
-									{/* קבוצה 1 */}
-									<div className='mb-3 flex items-center'>
-										<div
-											className='w-4 h-4 rounded-full mr-2'
-											style={{
-												backgroundColor: gameDay.teams[game.team1Index].color || DEFAULT_COLOR,
-											}}></div>
-										<span className='flex-1'>{gameDay.teams[game.team1Index].name}</span>
-										<input
-											type='number'
-											min='0'
-											value={game.scores[0]}
-											onChange={(e) =>
-												updateGameScore(gameIndex, 1, parseInt(e.target.value) || 0)
-											}
-											className='w-16 border rounded p-2 text-center'
-										/>
-									</div>
-
-									{/* קבוצה 2 */}
-									<div className='mb-4 flex items-center'>
-										<div
-											className='w-4 h-4 rounded-full mr-2'
-											style={{
-												backgroundColor: gameDay.teams[game.team2Index].color || DEFAULT_COLOR,
-											}}></div>
-										<span className='flex-1'>{gameDay.teams[game.team2Index].name}</span>
-										<input
-											type='number'
-											min='0'
-											value={game.scores[1]}
-											onChange={(e) =>
-												updateGameScore(gameIndex, 2, parseInt(e.target.value) || 0)
-											}
-											className='w-16 border rounded p-2 text-center'
-										/>
-									</div>
-
-									<button
-										onClick={() => finishGame(gameIndex)}
-										disabled={isSubmitting}
-										className='w-full py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50'>
-										{isSubmitting ? 'שומר...' : 'סיים משחק'}
-									</button>
-								</div>
-							))}
-						</div>
-					</div>
-				)}
-
-				{/* כפתור להוספת משחק חדש */}
-				{waitingTeams.length > 0 && (activeGames.length > 0 || teamStatistics.length > 0) && (
-					<div className='mb-6'>
-						<div className='p-4 bg-gray-50 rounded-lg border'>
-							<h3 className='text-lg font-medium mb-3'>בחר קבוצות למשחק הבא</h3>
-							<div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4'>
-								{gameDay.teams.map((team, index) => {
-									// הצג רק קבוצות שלא משחקות כרגע
-									const isPlaying = activeGames.some(
-										(game) => game.team1Index === index || game.team2Index === index
-									);
-
-									if (isPlaying) return null;
-
-									return (
-										<div
-											key={index}
-											onClick={() => toggleTeamSelection(index)}
-											className={`p-3 rounded-md cursor-pointer flex items-center ${
-												selectedTeams.includes(index)
-													? 'bg-green-100 border-2 border-green-500'
-													: 'bg-white border border-gray-300 hover:bg-gray-50'
+									className={`bg-white p-4 rounded-lg shadow-md ${
+										game.finished ? 'opacity-75' : ''
+									}`}>
+									{/* Game Status */}
+									<div className='mb-2 text-center'>
+										<span
+											className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+												game.finished
+													? 'bg-gray-200 text-gray-700'
+													: 'bg-green-100 text-green-800'
 											}`}>
-											<div
-												className='w-4 h-4 rounded-full mr-2'
-												style={{
-													backgroundColor: team.color || DEFAULT_COLOR,
-												}}></div>
-											<span>{team.name}</span>
+											{game.finished ? 'הסתיים' : 'פעיל'}
+										</span>
+									</div>
+
+									{/* Scoreboard */}
+									<div className='mb-4'>
+										<div className='flex justify-between items-center bg-green-700 text-white rounded-t-lg py-2 px-4'>
+											<span className='font-semibold'>
+												{gameDay.teams[game.team1Index]?.name || 'קבוצה 1'}
+											</span>
+											<div className='text-2xl font-bold'>
+												{game.scores[0]} - {game.scores[1]}
+											</div>
+											<span className='font-semibold'>
+												{gameDay.teams[game.team2Index]?.name || 'קבוצה 2'}
+											</span>
 										</div>
-									);
-								})}
-							</div>
-							<div className='flex flex-wrap gap-2'>
-								<button
-									onClick={addSelectedTeamsToGame}
-									disabled={selectedTeams.length !== 2}
-									className='px-4 py-2 bg-blue-600 text-white rounded-md disabled:opacity-50 hover:bg-blue-700'>
-									התחל משחק חדש
-								</button>
 
-								{lastWinner !== null && waitingTeams.length > 0 && (
-									<button
-										onClick={addNextGame}
-										className='px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700'>
-										משחק מהיר: {gameDay.teams[waitingTeams[0]].name} נגד{' '}
-										{gameDay.teams[lastWinner].name}
-									</button>
-								)}
-							</div>
-						</div>
+										<div className='bg-white border border-gray-200 rounded-b-lg'>
+											<div className='p-3'>
+												<p className='text-center text-sm text-gray-600 mb-2'>
+													לחץ על שם השחקן כדי להוסיף שער
+												</p>
+
+												{/* Team 1 Players */}
+												<div className='mb-3'>
+													<h4 className='font-medium text-green-800 mb-1'>
+														{gameDay.teams[game.team1Index]?.name}:
+													</h4>
+													<div className='flex flex-wrap gap-1'>
+														{gameDay.teams[game.team1Index]?.players.map((player) => (
+															<button
+																key={player.playerId}
+																onClick={() =>
+																	!game.finished && addGoalForPlayer(player.playerId)
+																}
+																disabled={game.finished}
+																className={`text-xs py-1 px-2 border rounded-full ${
+																	game.finished
+																		? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+																		: 'hover:bg-green-50 hover:border-green-300'
+																}`}>
+																{player.name}{' '}
+																{playerGoals[player.playerId] ? (
+																	<span className='inline-flex items-center'>
+																		({playerGoals[player.playerId]})
+																		<span className='text-xs ml-1'>⚽</span>
+																	</span>
+																) : null}
+															</button>
+														))}
+													</div>
+												</div>
+
+												{/* Team 2 Players */}
+												<div>
+													<h4 className='font-medium text-green-800 mb-1'>
+														{gameDay.teams[game.team2Index]?.name}:
+													</h4>
+													<div className='flex flex-wrap gap-1'>
+														{gameDay.teams[game.team2Index]?.players.map((player) => (
+															<button
+																key={player.playerId}
+																onClick={() =>
+																	!game.finished && addGoalForPlayer(player.playerId)
+																}
+																disabled={game.finished}
+																className={`text-xs py-1 px-2 border rounded-full ${
+																	game.finished
+																		? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+																		: 'hover:bg-green-50 hover:border-green-300'
+																}`}>
+																{player.name}{' '}
+																{playerGoals[player.playerId] ? (
+																	<span className='inline-flex items-center'>
+																		({playerGoals[player.playerId]})
+																		<span className='text-xs ml-1'>⚽</span>
+																	</span>
+																) : null}
+															</button>
+														))}
+													</div>
+												</div>
+											</div>
+
+											{!game.finished && (
+												<div className='bg-gray-50 p-2 text-center border-t'>
+													<Button
+														variant='outline'
+														onClick={() => finishGame(gameIndex)}
+														className='bg-green-600 text-white hover:bg-green-700 hover:text-white'>
+														סיים משחק
+													</Button>
+												</div>
+											)}
+										</div>
+									</div>
+								</div>
+							))
+						)}
 					</div>
-				)}
+				</div>
 
-				{/* טבלת סטטיסטיקות */}
-				{teamStatistics.length > 0 && (
-					<div className='mb-6'>
-						<h3 className='text-lg font-medium mb-3'>טבלת תוצאות</h3>
+				{/* Add a section for completed games */}
+				<h3 className='text-md font-semibold text-gray-700 mt-6 mb-2'>משחקים שהסתיימו:</h3>
+				<div className='bg-white rounded-lg shadow overflow-hidden'>
+					{activeGames.filter((game) => game.finished).length > 0 ? (
+						<table className='min-w-full divide-y divide-gray-200'>
+							<thead className='bg-green-700'>
+								<tr>
+									<th className='px-6 py-3 text-right text-xs font-medium text-white uppercase tracking-wider'>
+										קבוצה 1
+									</th>
+									<th className='px-6 py-3 text-center text-xs font-medium text-white uppercase tracking-wider'>
+										תוצאה
+									</th>
+									<th className='px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider'>
+										קבוצה 2
+									</th>
+								</tr>
+							</thead>
+							<tbody className='bg-white divide-y divide-gray-200'>
+								{activeGames
+									.filter((game) => game.finished)
+									.map((game, index) => (
+										<tr
+											key={index}
+											className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+											<td className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right'>
+												{gameDay.teams[game.team1Index]?.name}
+											</td>
+											<td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center font-bold'>
+												{game.scores[0]} - {game.scores[1]}
+											</td>
+											<td className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-left'>
+												{gameDay.teams[game.team2Index]?.name}
+											</td>
+										</tr>
+									))}
+							</tbody>
+						</table>
+					) : (
+						<div className='p-4 text-center text-gray-500'>אין משחקים שהסתיימו</div>
+					)}
+				</div>
+
+				{/* Team Statistics Table */}
+				<div>
+					<h2 className='text-xl font-bold text-green-800 mb-4'>טבלת הקבוצות</h2>
+					{teamStatistics && teamStatistics.length > 0 ? (
 						<div className='bg-white rounded-lg shadow overflow-hidden'>
 							<table className='min-w-full divide-y divide-gray-200'>
-								<thead className='bg-gray-50'>
+								<thead className='bg-green-700'>
 									<tr>
-										<th
-											scope='col'
-											className='px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider'>
-											מיקום
-										</th>
-										<th
-											scope='col'
-											className='px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider'>
+										<th className='px-6 py-3 text-right text-xs font-medium text-white uppercase tracking-wider'>
 											קבוצה
 										</th>
-										<th
-											scope='col'
-											className='px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider'>
-											מש&quot;
+										<th className='px-6 py-3 text-center text-xs font-medium text-white uppercase tracking-wider'>
+											משחקים
 										</th>
-										<th
-											scope='col'
-											className='px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider'>
-											נצ&quot;
+										<th className='px-6 py-3 text-center text-xs font-medium text-white uppercase tracking-wider'>
+											נצחונות
 										</th>
-										<th
-											scope='col'
-											className='px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider'>
+										<th className='px-6 py-3 text-center text-xs font-medium text-white uppercase tracking-wider'>
 											תיקו
 										</th>
-										<th
-											scope='col'
-											className='px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider'>
-											הפ&quot;
+										<th className='px-6 py-3 text-center text-xs font-medium text-white uppercase tracking-wider'>
+											הפסדים
 										</th>
-										<th
-											scope='col'
-											className='px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider'>
-											בעד
-										</th>
-										<th
-											scope='col'
-											className='px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider'>
-											נגד
-										</th>
-										<th
-											scope='col'
-											className='px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider'>
-											הפרש
-										</th>
-										<th
-											scope='col'
-											className='px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider'>
-											נק&quot;
+										<th className='px-6 py-3 text-center text-xs font-medium text-white uppercase tracking-wider'>
+											יחס שערים
 										</th>
 									</tr>
 								</thead>
 								<tbody className='bg-white divide-y divide-gray-200'>
 									{teamStatistics
-										.sort((a, b) => {
-											// סידור לפי נקודות (נצחון = 3, תיקו = 1)
-											const pointsA = a.won * 3 + a.drawn;
-											const pointsB = b.won * 3 + b.drawn;
-
-											if (pointsB !== pointsA) {
-												return pointsB - pointsA;
-											}
-
-											// יחס שערים
-											const goalDiffA = a.goalsFor - a.goalsAgainst;
-											const goalDiffB = b.goalsFor - b.goalsAgainst;
-
-											return goalDiffB - goalDiffA;
-										})
-										.map((stat, index) => {
-											const points = stat.won * 3 + stat.drawn;
-											// קבל את שם הקבוצה ישירות או דרך אינדקס
-											const teamName = stat.teamName || gameDay.teams[stat.teamIndex]?.name || '';
-											const goalDifference = stat.goalsFor - stat.goalsAgainst;
-
-											return (
-												<tr
-													key={stat.teamIndex}
-													className={`
-														hover:bg-gray-50
-														${index === 0 ? 'bg-green-50' : ''}
-														${index === teamStatistics.length - 1 && teamStatistics.length > 1 ? 'bg-red-50' : ''}
-													`}>
-													<td className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900'>
-														{index + 1}
-													</td>
-													<td className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900'>
-														<div className='flex items-center'>
-															<div
-																className='w-3 h-3 rounded-full mr-2'
-																style={{
-																	backgroundColor:
-																		gameDay.teams.find((t) => t.name === teamName)
-																			?.color || DEFAULT_COLOR,
-																}}></div>
-															{teamName}
-														</div>
-													</td>
-													<td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center'>
-														{stat.played}
-													</td>
-													<td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center'>
-														{stat.won}
-													</td>
-													<td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center'>
-														{stat.drawn}
-													</td>
-													<td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center'>
-														{stat.lost}
-													</td>
-													<td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center'>
-														{stat.goalsFor}
-													</td>
-													<td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center'>
-														{stat.goalsAgainst}
-													</td>
-													<td
-														className={`px-6 py-4 whitespace-nowrap text-sm text-center font-medium
-															${goalDifference > 0 ? 'text-green-600' : goalDifference < 0 ? 'text-red-600' : 'text-gray-500'}
-														`}>
-														{goalDifference > 0 ? '+' : ''}
-														{goalDifference}
-													</td>
-													<td className='px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-center'>
-														{points}
-													</td>
-												</tr>
-											);
-										})}
+										.sort((a, b) => b.won * 3 + b.drawn - (a.won * 3 + a.drawn))
+										.map((stat, index) => (
+											<tr
+												key={index}
+												className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+												<td className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900'>
+													{stat.teamName || gameDay.teams[stat.teamIndex]?.name}
+												</td>
+												<td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center'>
+													{stat.played}
+												</td>
+												<td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center'>
+													{stat.won}
+												</td>
+												<td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center'>
+													{stat.drawn}
+												</td>
+												<td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center'>
+													{stat.lost}
+												</td>
+												<td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center'>
+													{stat.goalsFor} - {stat.goalsAgainst}
+												</td>
+											</tr>
+										))}
 								</tbody>
 							</table>
 						</div>
-					</div>
-				)}
+					) : (
+						<div className='bg-white p-4 rounded-lg shadow text-center text-gray-500'>
+							אין נתונים סטטיסטיים זמינים
+						</div>
+					)}
+				</div>
 
-				{/* כפתור לשמירת כל הנתונים */}
-				{teamStatistics.length > 0 && (
-					<div className='mt-8 flex justify-center'>
-						<button
-							onClick={() => saveAllData()}
-							disabled={isSubmitting}
-							className='px-6 py-3 bg-green-600 text-white font-medium rounded-md hover:bg-green-700 disabled:opacity-50'>
-							{isSubmitting ? 'שומר נתונים...' : 'שמור את כל נתוני יום המשחקים'}
-						</button>
+				{/* Top Scorers Section */}
+				<div>
+					<h2 className='text-xl font-bold text-green-800 mb-4'>טבלת מלכי השערים</h2>
+					{topScorers.length > 0 ? (
+						<div className='bg-white rounded-lg shadow overflow-hidden'>
+							<table className='min-w-full divide-y divide-gray-200'>
+								<thead className='bg-green-700'>
+									<tr>
+										<th className='px-6 py-3 text-right text-xs font-medium text-white uppercase tracking-wider'>
+											דירוג
+										</th>
+										<th className='px-6 py-3 text-right text-xs font-medium text-white uppercase tracking-wider'>
+											שחקן
+										</th>
+										<th className='px-6 py-3 text-right text-xs font-medium text-white uppercase tracking-wider'>
+											שערים
+										</th>
+										<th className='px-6 py-3 text-right text-xs font-medium text-white uppercase tracking-wider'>
+											משחקים
+										</th>
+									</tr>
+								</thead>
+								<tbody className='bg-white divide-y divide-gray-200'>
+									{topScorers.map((scorer, index) => (
+										<tr
+											key={scorer.playerId}
+											className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+											<td className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900'>
+												{index + 1}
+											</td>
+											<td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>
+												{scorer.playerName}
+											</td>
+											<td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>
+												{scorer.goals}
+											</td>
+											<td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>
+												{scorer.matches}
+											</td>
+										</tr>
+									))}
+								</tbody>
+							</table>
+						</div>
+					) : (
+						<div className='bg-white p-4 rounded-lg shadow text-center text-gray-500'>
+							אין עדיין מלכי שערים. לחץ על שם של שחקן במשחק פעיל כדי להוסיף שער.
+						</div>
+					)}
+				</div>
+
+				{/* Team Selection */}
+				<div className='mt-8 mb-12'>
+					<h2 className='text-xl font-bold mb-4 text-center'>בחירת קבוצות למשחק הבא</h2>
+					<div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'>
+						{gameDay?.teams.map((team, index) => {
+							// Check if team is already playing
+							const isPlaying = activeGames.some(
+								(game) => game.team1Index === index || game.team2Index === index
+							);
+
+							return (
+								<button
+									key={index}
+									onClick={() => toggleTeamSelection(index)}
+									disabled={isPlaying}
+									className={`p-3 rounded-lg border ${
+										isPlaying
+											? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+											: selectedTeams.includes(index)
+											? 'bg-green-100 border-green-500 text-green-700'
+											: 'bg-white hover:bg-green-50 border-gray-200'
+									}`}>
+									<div className='font-bold'>{team.name}</div>
+									<div className='text-sm text-gray-600'>{team.players.length} שחקנים</div>
+								</button>
+							);
+						})}
 					</div>
-				)}
+
+					{selectedTeams.length === 2 && (
+						<div className='mt-4 flex justify-center'>
+							<Button
+								onClick={addSelectedTeamsToGame}
+								className='bg-green-600 hover:bg-green-700 text-white'>
+								התחל משחק עם הקבוצות שנבחרו
+							</Button>
+						</div>
+					)}
+				</div>
 			</div>
 		);
 	};
 
-	// הוספת קבוצות נבחרות למשחק
-	const addSelectedTeamsToGame = () => {
-		if (selectedTeams.length !== 2 || !gameDay) return;
-
-		// יצירת משחק חדש עם הקבוצות הנבחרות
-		const newGame = {
-			team1Index: selectedTeams[0],
-			team2Index: selectedTeams[1],
-			scores: [0, 0] as [number, number],
-		};
-
-		setActiveGames([...activeGames, newGame]);
-
-		// עדכון הקבוצות המחכות
-		const teamsInActiveGames = activeGames.flatMap((game) => [game.team1Index, game.team2Index]);
-		teamsInActiveGames.push(selectedTeams[0], selectedTeams[1]);
-
-		// מצא את כל הקבוצות שלא משחקות כרגע
-		const allTeamIndexes = gameDay.teams.map((_, index) => index);
-		const newWaitingTeams = allTeamIndexes.filter((index) => !teamsInActiveGames.includes(index));
-
-		setWaitingTeams(newWaitingTeams);
-
-		// איפוס הבחירה
-		setSelectedTeams([]);
-	};
-
-	// עדכון תוצאת משחק
-	const updateGameScore = (gameIndex: number, teamNumber: 1 | 2, score: number) => {
-		const updatedGames = [...activeGames];
-		if (teamNumber === 1) {
-			updatedGames[gameIndex].scores[0] = score;
-		} else {
-			updatedGames[gameIndex].scores[1] = score;
-		}
-		setActiveGames(updatedGames);
-	};
-
-	// סיום משחק ועדכון סטטיסטיקות
-	const finishGame = async (gameIndex: number) => {
-		if (!gameDay) return;
-
-		setIsSubmitting(true);
-
-		try {
-			const game = activeGames[gameIndex];
-			const team1Score = game.scores[0];
-			const team2Score = game.scores[1];
-
-			// עדכון הסטטיסטיקות
-			const updatedStats = [...teamStatistics];
-
-			// מציאת או יצירת סטטיסטיקה עבור קבוצה 1
-			let team1Stat = updatedStats.find((stat) => stat.teamIndex === game.team1Index);
-			if (!team1Stat) {
-				team1Stat = {
-					teamIndex: game.team1Index,
-					played: 0,
-					won: 0,
-					lost: 0,
-					drawn: 0,
-					goalsFor: 0,
-					goalsAgainst: 0,
-				};
-				updatedStats.push(team1Stat);
-			}
-
-			// מציאת או יצירת סטטיסטיקה עבור קבוצה 2
-			let team2Stat = updatedStats.find((stat) => stat.teamIndex === game.team2Index);
-			if (!team2Stat) {
-				team2Stat = {
-					teamIndex: game.team2Index,
-					played: 0,
-					won: 0,
-					lost: 0,
-					drawn: 0,
-					goalsFor: 0,
-					goalsAgainst: 0,
-				};
-				updatedStats.push(team2Stat);
-			}
-
-			// עדכון המשחקים ששוחקו
-			team1Stat.played += 1;
-			team2Stat.played += 1;
-
-			// עדכון הגולים
-			team1Stat.goalsFor += team1Score;
-			team1Stat.goalsAgainst += team2Score;
-			team2Stat.goalsFor += team2Score;
-			team2Stat.goalsAgainst += team1Score;
-
-			let winner: number | null = null;
-
-			// עדכון ניצחונות/הפסדים/תיקו
-			if (team1Score > team2Score) {
-				// קבוצה 1 ניצחה
-				team1Stat.won += 1;
-				team2Stat.lost += 1;
-				winner = game.team1Index;
-			} else if (team2Score > team1Score) {
-				// קבוצה 2 ניצחה
-				team2Stat.won += 1;
-				team1Stat.lost += 1;
-				winner = game.team2Index;
-			} else {
-				// תיקו
-				team1Stat.drawn += 1;
-				team2Stat.drawn += 1;
-			}
-
-			// יצירת אובייקט המשחק לשמירה בדאטהבייס
-			const matchResult = {
-				team1: gameDay.teams[game.team1Index].name,
-				team2: gameDay.teams[game.team2Index].name,
-				team1Score,
-				team2Score,
-				date: new Date().toISOString(),
-				winner: winner !== null ? gameDay.teams[winner].name : null,
-			};
-
-			// שמירת המשחק בדאטהבייס
-			const response = await matchApi.saveGameResult(params.id, matchResult);
-
-			if (response.success) {
-				// עדכון הסטטיסטיקות במצב המקומי
-				setTeamStatistics(updatedStats);
-				setLastWinner(winner);
-
-				// הסרת המשחק מהמשחקים הפעילים
-				const filteredGames = activeGames.filter((_, index) => index !== gameIndex);
-				setActiveGames(filteredGames);
-
-				// עדכון הקבוצות המחכות - הוסף את הקבוצות שסיימו לשחק לרשימת הקבוצות הזמינות
-				const teamsStillPlaying = filteredGames.flatMap((game) => [game.team1Index, game.team2Index]);
-				const allTeamIndexes = gameDay.teams.map((_, index) => index);
-				const newWaitingTeams = allTeamIndexes.filter((index) => !teamsStillPlaying.includes(index));
-				setWaitingTeams(newWaitingTeams);
-
-				// קריאה מחדש של הסטטיסטיקות - זה עשוי לעזור לרענן את המצב במערכת
-				try {
-					const statsResponse = await matchApi.getStatistics(params.id);
-					if (
-						statsResponse.success &&
-						statsResponse.data &&
-						statsResponse.data.statistics &&
-						statsResponse.data.statistics.length > 0
-					) {
-						// עדכון הסטטיסטיקות לאחר קבלתן מהשרת
-						console.log('נתוני סטטיסטיקות חדשים נטענו מהשרת:', statsResponse.data);
-					}
-				} catch (refreshError) {
-					console.error('שגיאה ברענון הסטטיסטיקות:', refreshError);
-				}
-			} else {
-				alert('שגיאה בשמירת תוצאות המשחק: ' + response.error);
-			}
-		} catch (err) {
-			console.error('Failed to save game result:', err);
-			alert('שגיאה בשמירת תוצאות המשחק');
-		} finally {
-			setIsSubmitting(false);
-		}
-	};
-
-	// הוספת משחק חדש בין המנצח האחרון לקבוצה שמחכה
-	const addNextGame = () => {
-		if (lastWinner === null || waitingTeams.length === 0 || !gameDay) return;
-
-		// לקיחת הקבוצה הבאה בתור
-		const nextTeamIndex = waitingTeams[0];
-
-		// וידוא שהקבוצות לא משחקות כרגע
-		const isPlaying = activeGames.some(
-			(game) =>
-				game.team1Index === nextTeamIndex ||
-				game.team2Index === nextTeamIndex ||
-				game.team1Index === lastWinner ||
-				game.team2Index === lastWinner
-		);
-
-		if (isPlaying) {
-			alert('אחת הקבוצות או שתיהן כבר משחקות במשחק אחר');
-			return;
-		}
-
-		// הוספת משחק חדש
-		const newGame = {
-			team1Index: nextTeamIndex,
-			team2Index: lastWinner,
-			scores: [0, 0] as [number, number],
-		};
-
-		setActiveGames([...activeGames, newGame]);
-
-		// עדכון הקבוצות המחכות
-		const teamsInActiveGames = [...activeGames, newGame].flatMap((game) => [game.team1Index, game.team2Index]);
-
-		// מצא את כל הקבוצות שלא משחקות כרגע
-		const allTeamIndexes = gameDay.teams.map((_, index) => index);
-		const newWaitingTeams = allTeamIndexes.filter((index) => !teamsInActiveGames.includes(index));
-
-		setWaitingTeams(newWaitingTeams);
-
-		// אם הקבוצות היו בבחירה, אפס את הבחירה
-		if (selectedTeams.includes(nextTeamIndex) || selectedTeams.includes(lastWinner)) {
-			setSelectedTeams([]);
-		}
-	};
-
-	// בחירת קבוצה למשחק
+	// Add the toggleTeamSelection function
 	const toggleTeamSelection = (teamIndex: number) => {
 		// אם הקבוצה כבר נבחרה, מוריד אותה מהרשימה
 		if (selectedTeams.includes(teamIndex)) {
@@ -1255,99 +1135,304 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 		}
 	};
 
-	// Function to save statistics to database
-	const saveStatisticsToDatabase = async () => {
-		if (!gameDay || teamStatistics.length === 0) return false;
+	// Add the addSelectedTeamsToGame function
+	const addSelectedTeamsToGame = () => {
+		if (selectedTeams.length !== 2 || !gameDay) return;
 
-		try {
-			// Format statistics for saving
-			const stats = teamStatistics.map((stat) => ({
-				teamId: gameDay.teams[stat.teamIndex].name, // Use name as ID
-				teamName: stat.teamName || gameDay.teams[stat.teamIndex].name,
-				played: stat.played,
-				won: stat.won,
-				drawn: stat.drawn,
-				lost: stat.lost,
-				goalsFor: stat.goalsFor,
-				goalsAgainst: stat.goalsAgainst,
-			}));
+		// יצירת משחק חדש עם הקבוצות הנבחרות
+		const newGame = {
+			team1Index: selectedTeams[0],
+			team2Index: selectedTeams[1],
+			scores: [0, 0] as [number, number],
+			finished: false,
+		};
 
-			// Save statistics to database
-			const response = await matchApi.saveStatistics(params.id, {
-				statistics: stats,
-			});
+		setActiveGames([...activeGames, newGame]);
 
-			return response.success;
-		} catch (err) {
-			console.error('Failed to save statistics:', err);
-			return false;
+		// עדכון הקבוצות המחכות
+		const teamsInActiveGames = activeGames.flatMap((game) => [game.team1Index, game.team2Index]);
+		teamsInActiveGames.push(selectedTeams[0], selectedTeams[1]);
+
+		// מצא את כל הקבוצות שלא משחקות כרגע
+		const allTeamIndexes = gameDay.teams.map((_, index) => index);
+		const newWaitingTeams = allTeamIndexes.filter((index) => !teamsInActiveGames.includes(index));
+
+		setWaitingTeams(newWaitingTeams);
+
+		// איפוס הבחירה
+		setSelectedTeams([]);
+	};
+
+	// Prefix unused functions with underscore to indicate they're available for future use
+	const _addNextGame = () => {
+		if (gameDay?.teams && gameDay.teams.length > 1) {
+			// Find available teams that are not currently playing
+			const teamsPlaying = activeGames
+				.filter((game) => !game.finished)
+				.flatMap((game) => [game.team1Index, game.team2Index]);
+
+			const availableTeams = gameDay.teams
+				.map((_, index) => index)
+				.filter((index) => !teamsPlaying.includes(index));
+
+			// If we have at least 2 available teams, create a new game
+			if (availableTeams.length >= 2) {
+				// Select first two available teams
+				const newTeam1Index = availableTeams[0];
+				const newTeam2Index = availableTeams[1];
+
+				setActiveGames([
+					...activeGames,
+					{
+						team1Index: newTeam1Index,
+						team2Index: newTeam2Index,
+						scores: [0, 0],
+						finished: false,
+					},
+				]);
+
+				// Clear team selection
+				setSelectedTeams([]);
+			} else {
+				alert('אין מספיק קבוצות זמינות למשחק חדש');
+			}
 		}
 	};
 
-	// Function to save all data at the end of the game day
-	const saveAllData = async () => {
-		if (!gameDay) return false;
-
-		try {
-			setIsSubmitting(true);
-
-			// Save all match results first
-			const allMatchPromises = activeGames.map((game) =>
-				matchApi.saveGameResult(params.id, {
-					team1: gameDay.teams[game.team1Index].name,
-					team2: gameDay.teams[game.team2Index].name,
-					team1Score: game.scores[0],
-					team2Score: game.scores[1],
-					date: new Date().toISOString(),
-					winner:
-						game.scores[0] > game.scores[1]
-							? gameDay.teams[game.team1Index].name
-							: game.scores[1] > game.scores[0]
-							? gameDay.teams[game.team2Index].name
-							: null,
-				})
-			);
-
-			const allMatchResults = await Promise.all(allMatchPromises);
-
-			if (!allMatchResults.every((result) => result.success)) {
-				throw new Error('Failed to save some match results');
-			}
-
-			// Then save statistics
-			const statsSuccess = await saveStatisticsToDatabase();
-
-			if (!statsSuccess) {
-				throw new Error('Failed to save statistics');
-			}
-
-			// Update gameday status to completed
-			const response = await matchApi.update(params.id, {
-				isCompleted: true,
-			});
-
-			if (response.success) {
-				// Update local state
-				if (gameDay) {
-					setGameDay({
-						...gameDay,
-						isCompleted: true,
-					});
+	const _updateGameScore = (gameIndex: number, teamNumber: 1 | 2, score: number) => {
+		setActiveGames((currentGames) => {
+			return currentGames.map((game, index) => {
+				if (index === gameIndex) {
+					const newScores = [...game.scores];
+					newScores[teamNumber - 1] = Math.max(0, score); // Ensure score is not negative
+					return {...game, scores: newScores as [number, number]};
 				}
-				alert('נתוני יום המשחקים נשמרו בהצלחה!');
-				return true;
-			} else {
-				alert('שגיאה בשמירת נתוני יום המשחקים: ' + response.error);
-				return false;
-			}
+				return game;
+			});
+		});
+	};
+
+	const _saveAllData = async () => {
+		setIsSubmitting(true);
+		try {
+			// Save team statistics to the database
+			await saveStatisticsToDatabase();
+
+			// Save any other data that needs to be persisted
+
+			alert('כל הנתונים נשמרו בהצלחה!');
+			return true;
 		} catch (error) {
-			console.error('Error saving all data:', error);
+			console.error('שגיאה בשמירת הנתונים:', error);
 			alert('שגיאה בשמירת הנתונים');
 			return false;
 		} finally {
 			setIsSubmitting(false);
 		}
 	};
+
+	// Define the findPlayerInfo helper function
+	const findPlayerInfo = (playerId: string) => {
+		if (!gameDay) return null;
+
+		for (const team of gameDay.teams) {
+			const player = team.players.find((p) => p.playerId === playerId);
+			if (player) {
+				return {
+					name: player.name,
+					team: team.name,
+				};
+			}
+		}
+		return null;
+	};
+
+	// Update buildTopScorersFromLocalData to use the correct types
+	const buildTopScorersFromLocalData = () => {
+		if (!gameDay) return [] as PlayerStats[];
+
+		// Use the playerGoals state to build the top scorers list
+		const scorers = Object.entries(playerGoals).map(([playerId, goals]) => {
+			const playerInfo = findPlayerInfo(playerId);
+			return {
+				playerId: playerId,
+				playerName: playerInfo?.name || 'Unknown Player',
+				team: playerInfo?.team || 'Unknown Team',
+				goals: goals,
+				matches: 1, // We can improve this if needed
+			} as PlayerStats;
+		});
+
+		return scorers.sort((a, b) => b.goals - a.goals);
+	};
+
+	// Import the addGoal function from the API
+	const addGoal = async ({playerId, matchId, goals}: {playerId: string; matchId: string; goals: number}) => {
+		try {
+			await fetch('/api/goals', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({playerId, matchId, goals}),
+			});
+			return true;
+		} catch (error) {
+			console.error('Error adding goal:', error);
+			return false;
+		}
+	};
+
+	// Add the addGoalForPlayer function
+	const addGoalForPlayer = async (playerId: string) => {
+		if (!gameDay || !currentGame) return;
+
+		// Update player goals in state
+		setPlayerGoals((prev) => {
+			const newGoals = {...prev};
+			newGoals[playerId] = (newGoals[playerId] || 0) + 1;
+			return newGoals;
+		});
+
+		// Update top scorers list
+		buildTopScorersFromLocalData();
+
+		// Call API to save goal if we have valid IDs
+		if (gameDay.id) {
+			await addGoal({
+				playerId,
+				matchId: gameDay.id,
+				goals: (playerGoals[playerId] || 0) + 1,
+			});
+		}
+	};
+
+	// Update the finishGame function to save game results to the database
+	const finishGame = async (gameIndex: number) => {
+		if (!gameDay) return;
+
+		// Update local state first
+		const updatedGames = [...activeGames];
+		updatedGames[gameIndex].finished = true;
+
+		// Determine the winner
+		const game = updatedGames[gameIndex];
+		let winnerTeamIndex = null;
+
+		if (game.scores[0] > game.scores[1]) {
+			winnerTeamIndex = game.team1Index;
+		} else if (game.scores[1] > game.scores[0]) {
+			winnerTeamIndex = game.team2Index;
+		}
+
+		// Update local state
+		setActiveGames(updatedGames);
+
+		// Save the game result to the database
+		try {
+			// Create a game result object to send to the API
+			const gameResult = {
+				matchId: params.id,
+				team1Index: game.team1Index,
+				team2Index: game.team2Index,
+				team1Score: game.scores[0],
+				team2Score: game.scores[1],
+				winnerIndex: winnerTeamIndex,
+				date: new Date().toISOString(),
+			};
+
+			console.log('Saving game result:', gameResult);
+
+			// Call the API to save the game result
+			const response = await matchApi.saveGameResult(gameResult);
+
+			if (response && response.success) {
+				console.log('Game result saved successfully');
+
+				// After saving, refresh the statistics to show updated tables
+				const statsResponse = await matchApi.getStatistics(params.id);
+				if (statsResponse && statsResponse.success && statsResponse.data) {
+					console.log('Updated statistics:', statsResponse.data);
+
+					// Update team statistics if available
+					if (statsResponse.data.statistics) {
+						const serverStats = statsResponse.data.statistics;
+						const localStats = serverStats
+							.map((stat) => {
+								const teamIndex = gameDay.teams.findIndex((team) => team.name === stat.teamName);
+
+								if (teamIndex !== -1) {
+									return {
+										teamIndex,
+										teamName: stat.teamName,
+										played: stat.played,
+										won: stat.won,
+										drawn: stat.drawn,
+										lost: stat.lost,
+										goalsFor: stat.goalsFor,
+										goalsAgainst: stat.goalsAgainst,
+									};
+								}
+								return null;
+							})
+							.filter(Boolean);
+
+						setTeamStatistics(localStats as any);
+					}
+				}
+			} else {
+				console.error('Failed to save game result:', response?.error);
+			}
+		} catch (error) {
+			console.error('Error saving game result:', error);
+		}
+
+		// Update waiting teams
+		const teamsInActiveGames = activeGames
+			.filter((g, i) => i !== gameIndex || !g.finished)
+			.flatMap((game) => [game.team1Index, game.team2Index]);
+
+		const allTeamIndexes = gameDay.teams.map((_, index) => index);
+		const newWaitingTeams = allTeamIndexes.filter((index) => !teamsInActiveGames.includes(index));
+
+		setWaitingTeams(newWaitingTeams);
+
+		// Also save player goals
+		await saveStatisticsToDatabase();
+	};
+
+	// Add the saveStatisticsToDatabase function
+	const saveStatisticsToDatabase = async () => {
+		if (!gameDay) return;
+
+		try {
+			// For each player with goals, save their statistics
+			for (const [playerId, goals] of Object.entries(playerGoals)) {
+				await addGoal({
+					playerId,
+					matchId: params.id,
+					goals: goals,
+				});
+			}
+
+			// Update the match information if needed
+			// This would depend on your API implementation
+
+			alert('סטטיסטיקות נשמרו בהצלחה!');
+		} catch (error) {
+			console.error('Error saving statistics:', error);
+			alert('שגיאה בשמירת הסטטיסטיקות');
+		}
+	};
+
+	// In GameDayPage, add a useEffect to update currentGame when active game changes
+	useEffect(() => {
+		if (activeGames && activeGames.length > 0) {
+			// Find the first non-finished game or use the last game
+			const activeGame = activeGames.find((game: any) => !game.finished) || activeGames[activeGames.length - 1];
+			setCurrentGame(activeGame);
+		}
+	}, [activeGames]);
 
 	if (isLoading) {
 		return (

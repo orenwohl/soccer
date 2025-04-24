@@ -5,17 +5,7 @@ import {useRouter} from 'next/navigation';
 import Link from 'next/link';
 import {Player, TeamPlayer} from '@/app/types';
 import {playerApi, matchApi} from '@/app/services/api';
-
-// צבעים מוגדרים מראש עבור קבוצות
-const TEAM_COLORS = [
-	{name: 'אדום', value: '#ef4444', textColor: 'white'},
-	{name: 'לבן', value: '#f9fafb', textColor: 'black'},
-	{name: 'שחור', value: '#1f2937', textColor: 'white'},
-	{name: 'כחול', value: '#3b82f6', textColor: 'white'},
-	{name: 'צהוב', value: '#fbbf24', textColor: 'black'},
-	{name: 'כתום', value: '#f97316', textColor: 'white'},
-	{name: 'ירוק', value: '#22c55e', textColor: 'white'},
-];
+import {TeamShirt, TEAM_COLORS} from '@/app/components/TeamShirt';
 
 // Color Picker Modal Component
 interface ColorPickerModalProps {
@@ -751,10 +741,12 @@ export default function NewGameDayPage() {
 										key={index}
 										className='bg-white p-4 rounded-md border border-gray-200'>
 										<div className='flex items-center mb-2'>
-											<div
-												className='h-6 w-6 rounded-full mr-2'
-												style={{backgroundColor: team.color}}></div>
-											<span className='font-medium'>{team.name}</span>
+											<TeamShirt
+												color={team.color}
+												size='md'
+												animated
+											/>
+											<span className='font-medium ml-2'>{team.name}</span>
 											<button
 												type='button'
 												onClick={() => handleRemoveTeam(index)}
@@ -827,7 +819,7 @@ export default function NewGameDayPage() {
 						onClose={() => setIsColorPickerOpen(false)}
 						selectedTeam={selectedTeamForColor?.team}
 						onSelectColor={handleTeamColorChange}
-						usedColors={formData.teams.map((t) => t.color)}
+						usedColors={formData.teams.map((team) => team.color)}
 					/>
 				</>
 			);

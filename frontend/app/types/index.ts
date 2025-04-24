@@ -2,8 +2,10 @@ export interface Player {
 	_id: string;
 	name: string;
 	rating: number;
-	email: string;
 	phone: string;
+	fitnessRating: number;
+	defenseRating: number;
+	techniqueRating: number;
 	createdAt?: string;
 	updatedAt?: string;
 }
@@ -22,12 +24,23 @@ export interface Team {
 	score?: number;
 }
 
+export interface Goal {
+	playerId: string;
+	playerName: string;
+	teamId: string;
+	teamName: string;
+	matchId: string;
+	gameDayId: string;
+	timestamp: string;
+}
+
 export interface GameMatch {
 	team1: string;
 	team2: string;
 	team1Score?: number;
 	team2Score?: number;
 	isCompleted: boolean;
+	goals?: Goal[];
 }
 
 export interface GameDay {
@@ -39,6 +52,7 @@ export interface GameDay {
 	isCompleted: boolean;
 	createdAt?: string;
 	updatedAt?: string;
+	goals?: Goal[];
 }
 
 export interface Match {
@@ -49,6 +63,7 @@ export interface Match {
 	isCompleted: boolean;
 	createdAt?: string;
 	updatedAt?: string;
+	goals?: Goal[];
 }
 
 export interface TeamStats {
@@ -63,8 +78,16 @@ export interface TeamStats {
 	points: number;
 }
 
+export interface PlayerStats {
+	playerId: string;
+	playerName: string;
+	goals: number;
+	matches: number;
+}
+
 export interface LeagueTable {
 	teams: TeamStats[];
+	topScorers?: PlayerStats[];
 	lastUpdated: string;
 }
 
