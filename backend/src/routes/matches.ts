@@ -12,19 +12,20 @@ import {
 	saveTeamStats,
 	getMatchStatistics,
 } from '../controllers/matchController';
+import {protect} from '../middleware/auth';
 
 const router = express.Router();
 
-router.route('/').get(getAllMatches).post(createMatch);
+router.route('/').get(getAllMatches).post(protect, createMatch);
 
-router.route('/:id').get(getMatch).put(updateMatch).delete(deleteMatch);
+router.route('/:id').get(protect, getMatch).put(protect, updateMatch).delete(protect, deleteMatch);
 
-router.route('/generate-teams').post(generateTeams);
+router.route('/generate-teams').post(protect, generateTeams);
 
 // Game results and statistics routes
-router.route('/:id/game-result').post(saveGameResult);
-router.route('/:id/match/:matchId').put(updateGameResult);
-router.route('/:id/statistics').post(saveStatistics).get(getMatchStatistics);
-router.route('/:id/stats').post(saveTeamStats);
+router.route('/:id/game-result').post(protect, saveGameResult);
+router.route('/:id/match/:matchId').put(protect, updateGameResult);
+router.route('/:id/statistics').post(protect, saveStatistics).get(protect, getMatchStatistics);
+router.route('/:id/stats').post(protect, saveTeamStats);
 
 export default router;

@@ -4,8 +4,8 @@
 	"description": "Backend for Neighborhood Football App",
 	"main": "dist/server.js",
 	"scripts": {
-		"start": "NODE_ENV=production node dist/server.js",
-		"dev": "NODE_ENV=development nodemon --watch src -e ts --exec ts-node src/server.ts",
+		"start": "cross-env NODE_ENV=production node dist/server.js",
+		"dev": "cross-env NODE_ENV=development nodemon --watch src -e ts --exec ts-node src/server.ts",
 		"build": "tsc",
 		"test": "echo \"Error: no test specified\" && exit 1"
 	},
@@ -41,6 +41,7 @@
 		"@types/mongoose": "^5.11.97",
 		"@types/morgan": "^1.9.9",
 		"@types/node": "^22.14.1",
+		"cross-env": "^7.0.3",
 		"nodemon": "^3.1.10"
 	}
 }
