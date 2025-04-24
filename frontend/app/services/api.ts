@@ -121,6 +121,34 @@ export const playerApi = {
 	},
 };
 
+export interface StatisticsResponse {
+	statistics: {
+		teamId: string;
+		teamName: string;
+		played: number;
+		won: number;
+		drawn: number;
+		lost: number;
+		goalsFor: number;
+		goalsAgainst: number;
+	}[];
+	gameResults: {
+		team1: string;
+		team2: string;
+		team1Score: number;
+		team2Score: number;
+		date: string;
+		winner: string | null;
+	}[];
+	topScorers?: {
+		playerId: string;
+		playerName: string;
+		team: string;
+		goals: number;
+		matches: number;
+	}[];
+}
+
 // Match API
 export const matchApi = {
 	getAll: async (): Promise<MatchesResponse> => {

@@ -14,6 +14,7 @@ export interface TeamPlayer {
 	playerId: string;
 	name: string;
 	rating: number;
+	goals?: number;
 }
 
 export interface Team {
@@ -40,7 +41,7 @@ export interface GameMatch {
 	team1Score?: number;
 	team2Score?: number;
 	isCompleted: boolean;
-	goals?: Goal[];
+	goals: Goal[];
 }
 
 export interface GameDay {

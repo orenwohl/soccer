@@ -494,7 +494,16 @@ export default function NewGameDayPage() {
 		// Get selected players with their details
 		const playersToAssign = availablePlayers
 			.filter((player) => selectedPlayers.includes(player._id))
-			.sort((a, b) => b.rating - a.rating); // Sort by rating (highest first)
+			.map((player) => ({
+				...player,
+				// Calculate a weighted score considering multiple attributes
+				// Defense (25% weight)
+				balanceScore:
+					(player.rating || 0) * 0.5 + // Overall rating (50% weight)
+					(player.fitness || 0) * 0.25 + // Fitness (25% weight)
+					(player.defense || 0) * 0.25,
+			}))
+			.sort((a, b) => b.balanceScore - a.balanceScore); // Sort by combined score (highest first)
 
 		// Calculate how many players should be in each team
 		const totalPlayers = playersToAssign.length;
@@ -502,12 +511,20 @@ export default function NewGameDayPage() {
 		const basePlayersPerTeam = Math.floor(totalPlayers / numTeams); // Minimum players per team
 		const extraPlayers = totalPlayers % numTeams; // Number of teams that will get an extra player
 
-		// Initialize team players arrays
+		// Initialize team players arrays and team attribute totals
 		const teamPlayers: TeamPlayer[][] = Array(numTeams)
 			.fill(null)
 			.map(() => []);
+		const teamStats = Array(numTeams)
+			.fill(null)
+			.map(() => ({
+				totalRating: 0,
+				totalFitness: 0,
+				totalDefense: 0,
+				playerCount: 0,
+			}));
 
-		// Distribute players using serpentine draft method (snake draft) while ensuring equal number of players
+		// Distribute players using serpentine draft method with multi-attribute balancing
 		let playerIndex = 0;
 
 		// First, ensure each team has the minimum number of players
@@ -515,46 +532,93 @@ export default function NewGameDayPage() {
 			// Forward direction for even rounds
 			if (round % 2 === 0) {
 				for (let team = 0; team < numTeams; team++) {
+					const player = playersToAssign[playerIndex];
 					teamPlayers[team].push({
-						playerId: playersToAssign[playerIndex]._id,
-						name: playersToAssign[playerIndex].name,
-						rating: playersToAssign[playerIndex].rating,
+						playerId: player._id,
+						name: player.name,
+						rating: player.rating,
+						// Include additional attributes if needed in the TeamPlayer interface
 					});
+
+					// Update team stats
+					teamStats[team].totalRating += player.rating || 0;
+					teamStats[team].totalFitness += player.fitness || 0;
+					teamStats[team].totalDefense += player.defense || 0;
+					teamStats[team].playerCount++;
+
 					playerIndex++;
 				}
 			}
 			// Backward direction for odd rounds
 			else {
 				for (let team = numTeams - 1; team >= 0; team--) {
+					const player = playersToAssign[playerIndex];
 					teamPlayers[team].push({
-						playerId: playersToAssign[playerIndex]._id,
-						name: playersToAssign[playerIndex].name,
-						rating: playersToAssign[playerIndex].rating,
+						playerId: player._id,
+						name: player.name,
+						rating: player.rating,
+						// Include additional attributes if needed
 					});
+
+					// Update team stats
+					teamStats[team].totalRating += player.rating || 0;
+					teamStats[team].totalFitness += player.fitness || 0;
+					teamStats[team].totalDefense += player.defense || 0;
+					teamStats[team].playerCount++;
+
 					playerIndex++;
 				}
 			}
 		}
 
-		// Distribute remaining players (if any) to the first 'extraPlayers' teams
-		// We go in reverse order so the teams with lower indices (which got the first picks)
-		// don't always get the extra player
+		// Distribute remaining players (if any) to the teams with lowest overall balance score
 		if (extraPlayers > 0) {
-			const extraDirection = basePlayersPerTeam % 2 === 0 ? -1 : 1; // Continue the snake pattern
-			let team = extraDirection === 1 ? 0 : numTeams - 1;
+			// Calculate average stats for each team
+			const teamBalanceScores = teamStats.map((stats) => {
+				const avgRating = stats.totalRating / stats.playerCount;
+				const avgFitness = stats.totalFitness / stats.playerCount;
+				const avgDefense = stats.totalDefense / stats.playerCount;
 
+				// Calculate same weighted balance as we did for players
+				return 0.5 * avgRating + 0.25 * avgFitness + 0.25 * avgDefense;
+			});
+
+			// Assign remaining players to teams with lowest balance scores
 			for (let i = 0; i < extraPlayers; i++) {
-				teamPlayers[team].push({
-					playerId: playersToAssign[playerIndex]._id,
-					name: playersToAssign[playerIndex].name,
-					rating: playersToAssign[playerIndex].rating,
-				});
-				playerIndex++;
-				team += extraDirection;
+				const player = playersToAssign[playerIndex];
 
-				// Safety check to avoid index out of bounds
-				if (team >= numTeams) team = numTeams - 1;
-				if (team < 0) team = 0;
+				// Find team with lowest balance score
+				let weakestTeamIndex = 0;
+				let lowestScore = teamBalanceScores[0];
+
+				for (let t = 1; t < numTeams; t++) {
+					if (teamBalanceScores[t] < lowestScore) {
+						lowestScore = teamBalanceScores[t];
+						weakestTeamIndex = t;
+					}
+				}
+
+				// Add player to weakest team
+				teamPlayers[weakestTeamIndex].push({
+					playerId: player._id,
+					name: player.name,
+					rating: player.rating,
+					// Include additional attributes if needed
+				});
+
+				// Update team stats
+				teamStats[weakestTeamIndex].totalRating += player.rating || 0;
+				teamStats[weakestTeamIndex].totalFitness += player.fitness || 0;
+				teamStats[weakestTeamIndex].totalDefense += player.defense || 0;
+				teamStats[weakestTeamIndex].playerCount++;
+
+				// Recalculate balance score for this team
+				teamBalanceScores[weakestTeamIndex] =
+					0.5 * (teamStats[weakestTeamIndex].totalRating / teamStats[weakestTeamIndex].playerCount) +
+					0.25 * (teamStats[weakestTeamIndex].totalFitness / teamStats[weakestTeamIndex].playerCount) +
+					0.25 * (teamStats[weakestTeamIndex].totalDefense / teamStats[weakestTeamIndex].playerCount);
+
+				playerIndex++;
 			}
 		}
 
