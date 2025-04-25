@@ -1,5 +1,5 @@
 @import 'tailwindcss';
-@import "tw-animate-css";
+@import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -38,6 +38,16 @@
 	--sidebar-accent-foreground: oklch(0.21 0.006 285.885);
 	--sidebar-border: oklch(0.92 0.004 286.32);
 	--sidebar-ring: oklch(0.705 0.015 286.067);
+	--game-spacing: 1.5rem;
+	--heading-large: 1.5rem;
+	--heading-medium: 1.25rem;
+	--heading-small: 1rem;
+	--score-size: 2.25rem;
+	--card-padding: 1rem;
+	--score-height: 3.5rem;
+	--card-margin: 1rem;
+	--team-selection-margin-top: 2rem;
+	--team-selection-margin-bottom: 3rem;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -124,10 +134,115 @@ body {
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
+	* {
+		@apply border-border outline-ring/50;
 	}
-  body {
-    @apply bg-background text-foreground;
+	body {
+		@apply bg-background text-foreground;
+	}
+}
+
+/* Mobile optimizations for gameday view */
+@media (max-width: 767px) {
+	/* Reduce spacing for game day container */
+	.gameday-container .space-y-6 {
+		margin-top: 0.5rem;
+		margin-bottom: 0.5rem;
+	}
+
+	/* Make headings smaller */
+	.gameday-container h2 {
+		font-size: 1.1rem;
+		margin-bottom: 0.5rem;
+	}
+
+	.gameday-container h3 {
+		font-size: 0.875rem;
+		margin-bottom: 0.25rem;
+		margin-top: 0.5rem;
+	}
+
+	/* Reduce padding and margins for game cards */
+	.gameday-container .p-3 {
+		padding: 0.5rem;
+	}
+
+	.gameday-container .p-4 {
+		padding: 0.5rem;
+	}
+
+	.gameday-container .mb-4 {
+		margin-bottom: 0.5rem;
+	}
+
+	.gameday-container .mt-8 {
+		margin-top: 0.5rem;
+	}
+
+	.gameday-container .mb-12 {
+		margin-bottom: 0.5rem;
+	}
+
+	/* Reduce game score size */
+	.gameday-container .text-4xl {
+		font-size: 1.5rem;
+		line-height: 1.5rem;
+	}
+
+	.gameday-container .h-14 {
+		height: 2rem;
+	}
+
+	/* Reduce player button padding */
+	.gameday-container .py-2 {
+		padding-top: 0.25rem;
+		padding-bottom: 0.25rem;
+	}
+
+	.gameday-container .space-y-1\.5,
+	.gameday-container .space-y-2 {
+		margin-top: 0.25rem;
+	}
+
+	/* Make VS smaller */
+	.gameday-container .text-xl {
+		font-size: 1rem;
+	}
+
+	/* Reduce space between items */
+	.gameday-container .space-y-4 > * + * {
+		margin-top: 0.5rem;
+	}
+
+	/* Make team names smaller */
+	.gameday-container .max-w-\[110px\] {
+		max-width: 90px;
+		font-size: 0.875rem;
+		margin-bottom: 0.25rem;
+	}
+
+	/* Reduce gap in grid layouts */
+	.gameday-container .gap-4 {
+		gap: 0.5rem;
+	}
+
+	/* Make goal indicators smaller */
+	.gameday-container .min-w-\[24px\] {
+		min-width: 20px;
+		padding: 0 0.25rem;
+	}
+
+	/* Mobile optimizations */
+	:root {
+		--game-spacing: 0.5rem;
+		--heading-large: 1.1rem;
+		--heading-medium: 0.95rem;
+		--heading-small: 0.8rem;
+		--score-size: 1.75rem;
+		--card-padding: 0.5rem;
+		--score-height: 2.5rem;
+		--card-margin: 0.5rem;
+		--team-selection-margin-top: 0.5rem;
+		--team-selection-margin-bottom: 0.5rem;
 	}
 }

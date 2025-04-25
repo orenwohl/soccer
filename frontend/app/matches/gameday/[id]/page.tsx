@@ -1,6 +1,6 @@
 'use client';
 
-import {useState, useEffect, ReactNode} from 'react';
+import {useState, useEffect, ReactNode, use} from 'react';
 import {useRouter} from 'next/navigation';
 import {TeamPlayer as ImportedTeamPlayer, Match} from '@/app/types';
 import {PlayerStats as ImportedPlayerStats} from '@/app/types';
@@ -142,6 +142,8 @@ interface Team {
 }
 
 export default function GameDayPage({params}: {params: {id: string}}) {
+	// Properly cast and unwrap params - use as any to work around typing issue
+	const {id} = use(params as any) as {id: string};
 	const [gameDay, setGameDay] = useState<Match | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -186,8 +188,8 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 		const fetchGameDay = async () => {
 			try {
 				setIsLoading(true);
-				console.log('Fetching match data for ID:', params.id);
-				const response = await matchApi.getById(params.id);
+				console.log('Fetching match data for ID:', id);
+				const response = await matchApi.getById(id);
 				console.log('Match API response:', response);
 
 				if (response.success) {
@@ -207,8 +209,8 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 					setWaitingTeams(initialWaitingTeams);
 
 					// Fetch statistics from server
-					console.log('Fetching statistics for match ID:', params.id);
-					const statsResponse = await matchApi.getStatistics(params.id);
+					console.log('Fetching statistics for match ID:', id);
+					const statsResponse = await matchApi.getStatistics(id);
 					console.log('Statistics API response:', statsResponse);
 					if (statsResponse.success && statsResponse.data) {
 						console.log('Statistics and game results loaded:', statsResponse.data);
@@ -291,7 +293,7 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 		};
 
 		fetchGameDay();
-	}, [params.id]);
+	}, [id]);
 
 	// Add rebalance teams functionality
 	const rebalanceTeams = () => {
@@ -697,7 +699,7 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 
 							try {
 								setIsSubmitting(true);
-								const response = await matchApi.update(params.id, {
+								const response = await matchApi.update(id, {
 									teams: gameDay.teams,
 								});
 
@@ -767,6 +769,64 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 							</div>
 						</CardContent>
 					</Card>
+
+					{/* Weather Card */}
+					<Card>
+						<CardHeader>
+							<CardTitle>מזג האוויר</CardTitle>
+						</CardHeader>
+						<CardContent>
+							{weatherLoading ? (
+								<div className='flex items-center justify-center py-4'>
+									<div className='w-6 h-6 border-2 border-gray-200 border-t-blue-500 rounded-full animate-spin'></div>
+									<span className='ml-2 text-gray-600'>טוען מזג אוויר...</span>
+								</div>
+							) : weatherError ? (
+								<div className='text-red-500'>{weatherError}</div>
+							) : weather ? (
+								<div className='flex flex-col space-y-4'>
+									<div className='flex items-center'>
+										{weather.current && (
+											<div className='w-16 h-16 mr-2 flex items-center justify-center'>
+												{getWeatherIcon(weather.current.weather_code)}
+											</div>
+										)}
+										<div>
+											<div className='text-2xl font-bold'>
+												{weather.current?.temperature_2m || 0}°C
+											</div>
+											<div className='text-gray-600'>
+												{getWeatherDescription(weather.current?.weather_code)}
+											</div>
+										</div>
+									</div>
+
+									<div className='grid grid-cols-2 gap-4'>
+										<div>
+											<h4 className='text-sm font-medium text-gray-500'>הרגשה כמו</h4>
+											<p>{weather.current?.apparent_temperature || 0}°C</p>
+										</div>
+										<div>
+											<h4 className='text-sm font-medium text-gray-500'>לחות</h4>
+											<p>{weather.current?.relative_humidity_2m || 0}%</p>
+										</div>
+										<div>
+											<h4 className='text-sm font-medium text-gray-500'>רוח</h4>
+											<p>{weather.current?.wind_speed_10m || 0} קמ"ש</p>
+										</div>
+										<div>
+											<h4 className='text-sm font-medium text-gray-500'>לחץ אוויר</h4>
+											<p>{weather.current?.pressure_msl || 0} hPa</p>
+										</div>
+									</div>
+								</div>
+							) : (
+								<div className='text-gray-500'>
+									{gameDay.location ? 'אין מידע על מזג האוויר זמין' : 'מיקום לא צוין'}
+								</div>
+							)}
+						</CardContent>
+					</Card>
 				</div>
 			</div>
 		);
@@ -784,13 +844,6 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 				<div className='pb-4 border-b border-green-700'>
 					<div className='flex justify-between items-center mb-4'>
 						<h2 className='text-xl font-bold text-green-800'>משחקים</h2>
-						{selectedTeams.length === 2 && !isCompleted && (
-							<Button
-								onClick={addSelectedTeamsToGame}
-								className='bg-green-600 hover:bg-green-700'>
-								התחל משחק
-							</Button>
-						)}
 					</div>
 
 					{isCompleted && (
@@ -801,10 +854,10 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 
 					{/* Team selection area */}
 					{!isCompleted && (
-						<div className='mb-4'>
-							<h3 className='text-md font-semibold text-gray-700 mb-2'>בחירת קבוצות למשחק הבא:</h3>
-							<div className='flex flex-wrap gap-2'>
-								{gameDay.teams.map((team, index) => {
+						<div className='mt-8 mb-12'>
+							<h2 className='text-xl font-bold mb-4 text-center'>בחירת קבוצות למשחק הבא</h2>
+							<div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'>
+								{gameDay?.teams.map((team, index) => {
 									// Check if team is already playing
 									const isPlaying = activeGames.some(
 										(game) =>
@@ -815,22 +868,32 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 										<button
 											key={index}
 											onClick={() => toggleTeamSelection(index)}
-											className={`px-3 py-1 rounded-full text-sm font-medium ${
-												selectedTeams.includes(index)
-													? 'bg-green-600 text-white'
-													: isPlaying
-													? 'bg-gray-300 text-gray-600 cursor-not-allowed'
-													: 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-											}`}
-											disabled={isPlaying || isCompleted}>
-											{team.name}
+											disabled={isPlaying || isCompleted}
+											className={`p-3 rounded-lg border ${
+												isPlaying || isCompleted
+													? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+													: selectedTeams.includes(index)
+													? 'bg-green-100 border-green-500 text-green-700'
+													: 'bg-white hover:bg-green-50 border-gray-200'
+											}`}>
+											<div className='font-bold'>{team.name}</div>
+											<div className='text-sm text-gray-600'>{team.players.length} שחקנים</div>
 										</button>
 									);
 								})}
 							</div>
+
+							{selectedTeams.length === 2 && (
+								<div className='mt-4 flex justify-center'>
+									<Button
+										onClick={addSelectedTeamsToGame}
+										className='bg-green-600 hover:bg-green-700 text-white'>
+										התחל משחק עם הקבוצות שנבחרו
+									</Button>
+								</div>
+							)}
 						</div>
 					)}
-
 					{/* Active Games */}
 					<h3 className='text-md font-semibold text-gray-700 mb-2'>משחקים פעילים:</h3>
 					<div className='flex flex-col space-y-4'>
@@ -1199,46 +1262,6 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 				</div>
 
 				{/* Team Selection */}
-				{!isCompleted && (
-					<div className='mt-8 mb-12'>
-						<h2 className='text-xl font-bold mb-4 text-center'>בחירת קבוצות למשחק הבא</h2>
-						<div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'>
-							{gameDay?.teams.map((team, index) => {
-								// Check if team is already playing
-								const isPlaying = activeGames.some(
-									(game) => !game.finished && (game.team1Index === index || game.team2Index === index)
-								);
-
-								return (
-									<button
-										key={index}
-										onClick={() => toggleTeamSelection(index)}
-										disabled={isPlaying || isCompleted}
-										className={`p-3 rounded-lg border ${
-											isPlaying || isCompleted
-												? 'bg-gray-100 text-gray-500 cursor-not-allowed'
-												: selectedTeams.includes(index)
-												? 'bg-green-100 border-green-500 text-green-700'
-												: 'bg-white hover:bg-green-50 border-gray-200'
-										}`}>
-										<div className='font-bold'>{team.name}</div>
-										<div className='text-sm text-gray-600'>{team.players.length} שחקנים</div>
-									</button>
-								);
-							})}
-						</div>
-
-						{selectedTeams.length === 2 && (
-							<div className='mt-4 flex justify-center'>
-								<Button
-									onClick={addSelectedTeamsToGame}
-									className='bg-green-600 hover:bg-green-700 text-white'>
-									התחל משחק עם הקבוצות שנבחרו
-								</Button>
-							</div>
-						)}
-					</div>
-				)}
 			</div>
 		);
 	};
@@ -1381,7 +1404,7 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 			// Save any other data that needs to be persisted
 			// Save current team assignments
 			try {
-				const teamResponse = await matchApi.update(params.id, {
+				const teamResponse = await matchApi.update(id, {
 					teams: gameDay.teams,
 				});
 
@@ -1422,7 +1445,7 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 			}
 
 			// Update match status to completed
-			const response = await matchApi.update(params.id, {
+			const response = await matchApi.update(id, {
 				isCompleted: true,
 			});
 
@@ -1647,7 +1670,7 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 			console.log('Saving game result:', gameResult);
 
 			// Save game result to server
-			const response = await matchApi.saveGameResult(params.id, gameResult);
+			const response = await matchApi.saveGameResult(id, gameResult);
 
 			if (!response?.success) {
 				throw new Error(response?.error || 'Problem saving game results');
@@ -1664,7 +1687,7 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 					if (playerId && typeof playerGoals === 'number' && playerGoals > 0) {
 						await addGoal({
 							playerId,
-							matchId: gameDay._id || params.id,
+							matchId: gameDay._id || id,
 							goals: playerGoals,
 						});
 						console.log(`Saved ${playerGoals} goals for player ${player.name}`);
@@ -1678,7 +1701,7 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 					if (playerId && typeof playerGoals === 'number' && playerGoals > 0) {
 						await addGoal({
 							playerId,
-							matchId: gameDay._id || params.id,
+							matchId: gameDay._id || id,
 							goals: playerGoals,
 						});
 						console.log(`Saved ${playerGoals} goals for player ${player.name}`);
@@ -1693,7 +1716,7 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 
 			// Refresh data from server
 			try {
-				const statsResponse = await matchApi.getStatistics(params.id);
+				const statsResponse = await matchApi.getStatistics(id);
 				if (statsResponse?.success && statsResponse.data) {
 					console.log('Updated statistics from server:', statsResponse.data);
 
@@ -1787,7 +1810,7 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 			for (const [playerId, goals] of Object.entries(playerGoals)) {
 				await addGoal({
 					playerId,
-					matchId: gameDay._id || params.id,
+					matchId: gameDay._id || id,
 					goals: goals,
 				});
 			}
@@ -1798,6 +1821,127 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 			console.error('Error saving statistics:', error);
 			return false;
 		}
+	};
+
+	// Add these state variables inside the GameDayPage component
+	const [weather, setWeather] = useState<any>(null);
+	const [weatherLoading, setWeatherLoading] = useState(false);
+	const [weatherError, setWeatherError] = useState<string | null>(null);
+
+	// Replace the fetchWeatherData function with this implementation
+	const fetchWeatherData = async (location: string) => {
+		if (!location) return;
+
+		setWeatherLoading(true);
+		try {
+			// First get coordinates from the location name
+			const geocodeResponse = await fetch(
+				`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
+					location
+				)}&count=1&language=he`
+			);
+
+			if (!geocodeResponse.ok) {
+				throw new Error('שגיאה בחיפוש מיקום');
+			}
+
+			const geocodeData = await geocodeResponse.json();
+
+			if (!geocodeData.results || geocodeData.results.length === 0) {
+				throw new Error('לא נמצא מיקום');
+			}
+
+			// Get coordinates from the first result
+			const {latitude, longitude} = geocodeData.results[0];
+
+			// Fetch weather data using coordinates
+			const weatherResponse = await fetch(
+				`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,pressure_msl&timezone=auto&forecast_days=1`
+			);
+
+			if (!weatherResponse.ok) {
+				throw new Error('שגיאה בטעינת נתוני מזג האוויר');
+			}
+
+			const weatherData = await weatherResponse.json();
+			setWeather(weatherData);
+			setWeatherError(null);
+		} catch (error) {
+			console.error('Error fetching weather data:', error);
+			setWeatherError('לא ניתן לטעון את מזג האוויר');
+		} finally {
+			setWeatherLoading(false);
+		}
+	};
+
+	// Add this useEffect to fetch weather when the gameDay location changes
+	useEffect(() => {
+		if (gameDay?.location) {
+			fetchWeatherData(gameDay.location);
+		}
+	}, [gameDay?.location]);
+
+	// Helper function to get weather description based on weather code
+	const getWeatherDescription = (code?: number) => {
+		if (!code) return 'לא ידוע';
+
+		const weatherCodes: Record<number, string> = {
+			0: 'בהיר',
+			1: 'בעיקר בהיר',
+			2: 'מעונן חלקית',
+			3: 'מעונן',
+			45: 'ערפל',
+			48: 'ערפל מפקיד',
+			51: 'גשם קל',
+			53: 'גשם מתון',
+			55: 'גשם חזק',
+			56: 'גשם קל קפוא',
+			57: 'גשם קפוא',
+			61: 'גשם קל',
+			63: 'גשם',
+			65: 'גשם חזק',
+			66: 'גשם קפוא קל',
+			67: 'גשם קפוא',
+			71: 'שלג קל',
+			73: 'שלג',
+			75: 'שלג כבד',
+			77: 'גרגירי שלג',
+			80: 'מטר קל',
+			81: 'מטר',
+			82: 'מטר כבד',
+			85: 'מטח שלג קל',
+			86: 'מטח שלג',
+			95: 'סופת רעמים',
+			96: 'סופת רעמים עם ברד קל',
+			99: 'סופת רעמים עם ברד כבד',
+		};
+
+		return weatherCodes[code] || 'לא ידוע';
+	};
+
+	// Helper function to return weather icon based on weather code
+	const getWeatherIcon = (code?: number) => {
+		if (!code) return null;
+
+		let iconText = '☁️';
+
+		if (code === 0) iconText = '☀️';
+		else if (code === 1) iconText = '🌤️';
+		else if (code === 2) iconText = '⛅';
+		else if (code === 3) iconText = '☁️';
+		else if (code === 45 || code === 48) iconText = '🌫️';
+		else if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67].includes(code)) iconText = '🌧️';
+		else if ([71, 73, 75, 77, 85, 86].includes(code)) iconText = '❄️';
+		else if ([80, 81, 82].includes(code)) iconText = '🌦️';
+		else if ([95, 96, 99].includes(code)) iconText = '⛈️';
+
+		return (
+			<div
+				className='w-16 h-16 flex items-center justify-center text-4xl'
+				aria-label={getWeatherDescription(code)}>
+				{iconText}
+			</div>
+		);
 	};
 
 	if (isLoading) {
@@ -1839,19 +1983,21 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 	}
 
 	return (
-		<div className='container mx-auto py-8 px-4 text-right'>
+		<div className='container mx-auto py-4 sm:py-8 px-2 sm:px-4 text-right'>
 			{gameDay && (
 				<>
-					<div className='flex flex-col md:flex-row justify-between items-start md:items-center mb-6'>
+					<div className='flex flex-col md:flex-row justify-between items-start md:items-center mb-3 md:mb-6'>
 						<div>
-							<h1 className='text-2xl font-bold'>יום משחקים: {formatDate(gameDay.date)}</h1>
-							{gameDay.location && <p className='text-gray-600 mt-1'>{gameDay.location}</p>}
+							<h1 className='text-xl sm:text-2xl font-bold'>יום משחקים: {formatDate(gameDay.date)}</h1>
+							{gameDay.location && (
+								<p className='text-sm sm:text-base text-gray-600 mt-0.5 sm:mt-1'>{gameDay.location}</p>
+							)}
 
 							{gameDay.isCompleted && (
-								<div className='mt-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-sm bg-blue-100 text-blue-800'>
+								<div className='mt-1 sm:mt-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs sm:text-sm bg-blue-100 text-blue-800'>
 									<svg
 										xmlns='http://www.w3.org/2000/svg'
-										className='h-4 w-4 mr-1'
+										className='h-3 w-3 sm:h-4 sm:w-4 mr-1'
 										fill='none'
 										viewBox='0 0 24 24'
 										stroke='currentColor'>
@@ -1867,16 +2013,16 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 							)}
 						</div>
 
-						<div className='flex space-x-2 mt-4 md:mt-0'>
+						<div className='flex space-x-2 mt-2 md:mt-0'>
 							<Button onClick={() => router.push('/matches')}>חזרה לרשימה</Button>
 						</div>
 					</div>
 
-					<div className='mb-6'>
-						<div className='inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground'>
+					<div className='mb-3 sm:mb-6'>
+						<div className='inline-flex h-8 sm:h-10 items-center justify-center rounded-md bg-muted p-0.5 sm:p-1 text-muted-foreground'>
 							<button
 								onClick={() => setActiveTab('overview')}
-								className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none ${
+								className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium transition-all focus-visible:outline-none ${
 									activeTab === 'overview'
 										? 'bg-background text-foreground shadow-sm'
 										: 'hover:bg-muted hover:text-foreground'
@@ -1885,7 +2031,7 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 							</button>
 							<button
 								onClick={() => setActiveTab('teams')}
-								className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none ${
+								className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium transition-all focus-visible:outline-none ${
 									activeTab === 'teams'
 										? 'bg-background text-foreground shadow-sm'
 										: 'hover:bg-muted hover:text-foreground'
@@ -1894,7 +2040,7 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 							</button>
 							<button
 								onClick={() => setActiveTab('games')}
-								className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none ${
+								className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium transition-all focus-visible:outline-none ${
 									activeTab === 'games'
 										? 'bg-background text-foreground shadow-sm'
 										: 'hover:bg-muted hover:text-foreground'
@@ -1904,19 +2050,19 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 						</div>
 					</div>
 
-					<div className='pt-4'>{activeTabContent}</div>
+					<div className='pt-2 sm:pt-4'>{activeTabContent}</div>
 
-					{/* Save button - only show if gameday is not completed */}
+					{/* Update Save button for mobile - make it smaller */}
 					{!gameDay.isCompleted && (
-						<div className='fixed bottom-6 right-6 z-10'>
+						<div className='fixed bottom-3 sm:bottom-6 right-3 sm:right-6 z-10'>
 							<button
 								onClick={saveAllData}
 								disabled={isSubmitting}
-								className='flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-full shadow-lg transition-all transform hover:scale-105'>
+								className='flex items-center justify-center gap-1 sm:gap-2 bg-green-600 hover:bg-green-700 text-white px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base rounded-full shadow-lg transition-all transform hover:scale-105'>
 								{isSubmitting ? (
 									<>
 										<svg
-											className='animate-spin -mr-1 h-5 w-5 text-white'
+											className='animate-spin -mr-1 h-4 w-4 sm:h-5 sm:w-5 text-white'
 											xmlns='http://www.w3.org/2000/svg'
 											fill='none'
 											viewBox='0 0 24 24'>
@@ -1938,7 +2084,7 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 									<>
 										<svg
 											xmlns='http://www.w3.org/2000/svg'
-											className='h-5 w-5'
+											className='h-4 w-4 sm:h-5 sm:w-5'
 											fill='none'
 											viewBox='0 0 24 24'
 											stroke='currentColor'>
@@ -1949,19 +2095,22 @@ export default function GameDayPage({params}: {params: {id: string}}) {
 												d='M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4'
 											/>
 										</svg>
-										שמור יום משחקים
+										שמור
 									</>
 								)}
 							</button>
 						</div>
 					)}
 
-					{/* Complete match day button */}
-					<div className={`fixed bottom-6 ${gameDay.isCompleted ? 'right-6' : 'left-6'} z-10`}>
+					{/* Update Complete match day button for mobile */}
+					<div
+						className={`fixed bottom-3 sm:bottom-6 ${
+							gameDay.isCompleted ? 'right-3 sm:right-6' : 'left-3 sm:left-6'
+						} z-10`}>
 						<button
 							onClick={completeMatchDay}
 							disabled={isSubmitting || gameDay.isCompleted}
-							className={`flex items-center justify-center gap-2 px-6 py-3 rounded-full shadow-lg transition-all transform hover:scale-105 ${
+							className={`flex items-center justify-center gap-1 sm:gap-2 px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base rounded-full shadow-lg transition-all transform hover:scale-105 ${
 								gameDay.isCompleted
 									? 'bg-gray-400 cursor-not-allowed'
 									: 'bg-blue-600 hover:bg-blue-700 text-white'

@@ -22,7 +22,18 @@ const corsOptions = {
 	origin:
 		process.env.NODE_ENV === 'production'
 			? ['https://yourproductiondomain.com'] // Replace with your production domain
-			: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:3030', 'http://127.0.0.1:3030'],
+			: [
+					'http://localhost:3000',
+					'http://127.0.0.1:3000',
+					'http://127.0.0.1:3001',
+					'http://localhost:3001',
+					'http://localhost:3030',
+					'http://127.0.0.1:3030',
+					'http://10.0.2.2:8081', // Android emulator
+					'http://localhost:8081', // iOS simulator
+					'exp://*', // Expo Go app
+					'*', // Allow all origins in development
+			  ],
 	credentials: true,
 	methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 	allowedHeaders: ['Content-Type', 'Authorization'],
