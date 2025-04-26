@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { matchApi } from '../services/api'
+import { matchService } from '../services/matchService'
 import { MatchesResponse, MatchResponse } from '../types'
 
 // Hook to fetch all matches
@@ -9,7 +9,7 @@ export function useMatches() {
 	return useQuery<MatchesResponse>({
 		queryKey: ['matches'],
 		queryFn: async () => {
-			const response = await matchApi.getAll()
+			const response = await matchService.getAll()
 
 			if (!response.success) {
 				throw new Error(typeof response.error === 'string' ? response.error : 'Failed to load matches')
@@ -25,7 +25,7 @@ export function useMatch(id: string) {
 	return useQuery<MatchResponse>({
 		queryKey: ['matches', id],
 		queryFn: async () => {
-			const response = await matchApi.getById(id)
+			const response = await matchService.getById(id)
 
 			if (!response.success) {
 				throw new Error(typeof response.error === 'string' ? response.error : 'Failed to load match')
@@ -42,7 +42,7 @@ export function useMatchStatistics(gameDayId: string) {
 	return useQuery({
 		queryKey: ['matches', gameDayId, 'statistics'],
 		queryFn: async () => {
-			const response = await matchApi.getStatistics(gameDayId)
+			const response = await matchService.getStatistics(gameDayId)
 
 			if (!response.success) {
 				throw new Error(typeof response.error === 'string' ? response.error : 'Failed to load match statistics')

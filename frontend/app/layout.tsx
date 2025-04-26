@@ -20,7 +20,7 @@ export default function RootLayout({
 }>) {
 	return (
 		<html lang="he" dir="rtl">
-			<body className={inter.className}>
+			<body className={inter.className} suppressHydrationWarning>
 				<QueryProvider>
 					<AuthProvider>
 						<div className="flex flex-col min-h-screen">

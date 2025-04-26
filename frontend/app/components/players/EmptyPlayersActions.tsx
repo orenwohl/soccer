@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { playerApi } from '../../services/api'
+import { playerService } from '@/app/services'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 export default function EmptyPlayersActions() {
@@ -16,10 +16,13 @@ export default function EmptyPlayersActions() {
 				name: 'שחקן לדוגמה',
 				email: `test${Date.now()}@example.com`,
 				phone: '050-0000000',
-				rating: 4
+				rating: 4,
+				fitnessRating: 4,
+				defenseRating: 4,
+				techniqueRating: 4
 			}
 
-			return playerApi.create(testPlayer)
+			return playerService.create(testPlayer)
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ['players'] })

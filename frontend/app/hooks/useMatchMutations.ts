@@ -1,7 +1,7 @@
 'use client'
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { matchApi } from '../services/api'
+import { matchService } from '../services/matchService'
 import { Match } from '../types'
 
 // Hook for creating a new match
@@ -9,7 +9,7 @@ export function useCreateMatch() {
 	const queryClient = useQueryClient()
 
 	return useMutation({
-		mutationFn: (matchData: Omit<Match, '_id' | 'createdAt' | 'updatedAt'>) => matchApi.create(matchData),
+		mutationFn: (matchData: Omit<Match, '_id' | 'createdAt' | 'updatedAt'>) => matchService.create(matchData),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ['matches'] })
 		}
@@ -21,7 +21,7 @@ export function useUpdateMatch() {
 	const queryClient = useQueryClient()
 
 	return useMutation({
-		mutationFn: ({ id, data }: { id: string; data: Partial<Omit<Match, '_id' | 'createdAt' | 'updatedAt'>> }) => matchApi.update(id, data),
+		mutationFn: ({ id, data }: { id: string; data: Partial<Omit<Match, '_id' | 'createdAt' | 'updatedAt'>> }) => matchService.update(id, data),
 		onSuccess: (_, variables) => {
 			queryClient.invalidateQueries({ queryKey: ['matches'] })
 			queryClient.invalidateQueries({ queryKey: ['matches', variables.id] })
@@ -34,7 +34,7 @@ export function useDeleteMatch() {
 	const queryClient = useQueryClient()
 
 	return useMutation({
-		mutationFn: (id: string) => matchApi.delete(id),
+		mutationFn: (id: string) => matchService.delete(id),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ['matches'] })
 		}
@@ -57,7 +57,7 @@ export function useSaveMatchResult() {
 				team1Score: number
 				team2Score: number
 			}
-		}) => matchApi.saveMatchResult(gameDayId, matchId, resultData),
+		}) => matchService.saveMatchResult(gameDayId, matchId, resultData),
 		onSuccess: (_, variables) => {
 			queryClient.invalidateQueries({ queryKey: ['matches'] })
 			queryClient.invalidateQueries({ queryKey: ['matches', variables.gameDayId] })
@@ -70,6 +70,6 @@ export function useSaveMatchResult() {
 // Hook for generating teams
 export function useGenerateTeams() {
 	return useMutation({
-		mutationFn: (data: { playerIds: string[]; numberOfTeams?: number; teamNames?: string[] }) => matchApi.generateTeams(data)
+		mutationFn: (data: { playerIds: string[]; numberOfTeams?: number; teamNames?: string[] }) => matchService.generateTeams(data)
 	})
 }
