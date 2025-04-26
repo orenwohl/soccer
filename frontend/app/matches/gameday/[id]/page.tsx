@@ -16,6 +16,7 @@ import type { Game, GameDayPlayerStats, GameDayTeamPlayer } from '@/app/types'
 import { TeamsTab } from './TeamsTab'
 import { OverviewTab } from './OverviewTab'
 import { GamesAndTableTab } from './GamesAndTableTab'
+import { useMatch } from '@/app/hooks/useMatches'
 
 // Default color if no color is specified
 const DEFAULT_COLOR = '#9ca3af' // Gray
@@ -50,6 +51,8 @@ export default function GameDayPage({ params }: { params: { id: string } }) {
 	const [playerGoals, setPlayerGoals] = useState<Record<string, number>>({})
 	const [topScorers, setTopScorers] = useState<GameDayPlayerStats[]>([])
 	const router = useRouter()
+
+	const { data: matchData, error: matchError, isLoading: matchIsLoading } = useMatch(id)
 
 	const [currentGame, setCurrentGame] = useState<Game | null>(null)
 

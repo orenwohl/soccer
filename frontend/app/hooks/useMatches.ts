@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { matchService } from '../services/matchService'
+import { matchService } from '@/app/services/'
 import { MatchesResponse, MatchResponse } from '../types'
 
 // Hook to fetch all matches

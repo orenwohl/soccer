@@ -544,30 +544,37 @@ export const addGoal = async (req: Request, res: Response): Promise<void> => {
 }
 
 // Get top scorers
-// export const getTopScorers = async (req: Request, res: Response): Promise<void> => {
-// 	try {
-// 		const collection = await dbService.getCollection('matches')
-// 		const matchId = req.params.id
-// 		const { teamId } = req.query
+export const getTopScorers = async (req: Request, res: Response): Promise<void> => {
+	try {
+		const collection = await dbService.getCollection('matches')
+		const matchId = req.params.id
 
-// 		const match = await collection.findOne({ _id: new ObjectId(matchId) })
-// 		if (!match) return res.status(404).json({ success: false, error: 'Match not found' })
+		const match = await collection.findOne({ _id: new ObjectId(matchId) })
+		if (!match) {
+			res.status(404).json({ success: false, error: 'Match not found' })
+			return
+		}
 
-// 		const topScorers = match.goals.reduce((acc: any, goal: any) => {
-// 			const { playerId, teamId } = goal
-// 			if (!acc[playerId]) {
-// 				acc[playerId] = { playerId, teamId, goals: 0, matches: 0 }
-// 			}
-// 			acc[playerId].goals++
-// 			acc[playerId].matches++
-// 			return acc
-// 		}, {})
+		if (!match.goals) {
+			res.status(200).json({ success: true, data: [] })
+			return
+		}
 
-// 		const sortedScorers = Object.values(topScorers).sort((a: any, b: any) => b.goals - a.goals)
-// 		const topScorers = sortedScorers.slice(0, 10)
-// 		return res.status(200).json({ success: true, data: topScorers })
-// 	} catch (error) {
-// 		console.error('Error fetching top scorers:', error)
-// 		res.status(500).json({ success: false, error: 'Failed to fetch top scorers' })
-// 	}
-// }
+		const topScorers = match.goals.reduce((acc: any, goal: any) => {
+			const { playerId, teamId } = goal
+			if (!acc[playerId]) {
+				acc[playerId] = { playerId, teamId, goals: 0, matches: 0 }
+			}
+			acc[playerId].goals++
+			acc[playerId].matches++
+			return acc
+		}, {})
+
+		const sortedScorers = Object.values(topScorers).sort((a: any, b: any) => b.goals - a.goals)
+
+		res.status(200).json({ success: true, data: sortedScorers })
+	} catch (error) {
+		console.error('Error fetching top scorers:', error)
+		res.status(500).json({ success: false, error: 'Failed to fetch top scorers' })
+	}
+}
